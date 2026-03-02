@@ -8,8 +8,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
+from loguru import logger
 from pydantic import BaseModel, Field
+
+from config.building import CFT_BUILDING, get_monitored_zones, get_zones_by_floor
+from config.thresholds import evaluate_comfort
+from core.freedom_index import compute_zone_freedom
+from data.store import store
 
 
 class ZoneState(BaseModel):
@@ -63,7 +70,54 @@ def aggregate_zone_state(
     Returns:
         ZoneState with all current metrics.
     """
-    ...
+    now = timestamp or datetime.now()
+
+    # Get latest comfort data
+    comfort_df = store.get_zone_data("comfort", zone_id)
+    temp_c = None
+    hum_pct = None
+    co2 = None
+    lux = None
+
+    if comfort_df is not None and not comfort_df.empty:
+        latest_comfort = comfort_df.sort_values("timestamp").iloc[-1]
+        temp_c = float(latest_comfort.get("temperature_c", 0)) if pd.notna(latest_comfort.get("temperature_c")) else None
+        hum_pct = float(latest_comfort.get("humidity_pct", 0)) if pd.notna(latest_comfort.get("humidity_pct")) else None
+        co2 = float(latest_comfort.get("co2_ppm", 0)) if pd.notna(latest_comfort.get("co2_ppm")) else None
+        lux = float(latest_comfort.get("illuminance_lux", 0)) if pd.notna(latest_comfort.get("illuminance_lux")) else None
+
+    # Get latest occupancy
+    occ_df = store.get_zone_data("occupancy", zone_id)
+    occ_count = 0
+    if occ_df is not None and not occ_df.empty:
+        latest_occ = occ_df.sort_values("timestamp").iloc[-1]
+        occ_count = int(latest_occ.get("occupant_count", 0))
+
+    # Get latest energy (sum over last reading period)
+    energy_df = store.get_zone_data("energy", zone_id)
+    total_energy = 0.0
+    if energy_df is not None and not energy_df.empty:
+        latest_energy = energy_df.sort_values("timestamp").iloc[-1]
+        total_energy = float(latest_energy.get("total_kwh", 0))
+
+    # Compute freedom index
+    freedom = compute_zone_freedom(zone_id)
+
+    # Determine status based on worst comfort metric
+    status = _classify_zone_status(temp_c, hum_pct, co2, lux)
+
+    return ZoneState(
+        zone_id=zone_id,
+        timestamp=now,
+        temperature_c=temp_c,
+        humidity_pct=hum_pct,
+        co2_ppm=co2,
+        illuminance_lux=lux,
+        occupant_count=occ_count,
+        total_energy_kwh=round(total_energy, 4),
+        freedom_index=freedom,
+        status=status,
+    )
 
 
 def compute_floor_state(floor: int) -> FloorState:
@@ -75,7 +129,36 @@ def compute_floor_state(floor: int) -> FloorState:
     Returns:
         FloorState with aggregated metrics.
     """
-    ...
+    now = datetime.now()
+    zones = get_zones_by_floor(floor)
+    monitored = [z for z in zones if z.has_sensors]
+
+    zone_states: list[ZoneState] = []
+    temps: list[float] = []
+    humidities: list[float] = []
+    total_occ = 0
+    total_energy = 0.0
+
+    for zone in monitored:
+        state = aggregate_zone_state(zone.id)
+        zone_states.append(state)
+
+        if state.temperature_c is not None:
+            temps.append(state.temperature_c)
+        if state.humidity_pct is not None:
+            humidities.append(state.humidity_pct)
+        total_occ += state.occupant_count
+        total_energy += state.total_energy_kwh
+
+    return FloorState(
+        floor=floor,
+        timestamp=now,
+        zones=zone_states,
+        avg_temperature=round(float(np.mean(temps)), 1) if temps else 0.0,
+        avg_humidity=round(float(np.mean(humidities)), 1) if humidities else 0.0,
+        total_occupancy=total_occ,
+        total_energy_kwh=round(total_energy, 4),
+    )
 
 
 def compute_building_state() -> BuildingState:
@@ -84,4 +167,73 @@ def compute_building_state() -> BuildingState:
     Returns:
         BuildingState with building-level aggregated metrics.
     """
-    ...
+    now = datetime.now()
+
+    floor_states = [
+        compute_floor_state(0),
+        compute_floor_state(1),
+    ]
+
+    total_occ = sum(f.total_occupancy for f in floor_states)
+    total_energy = sum(f.total_energy_kwh for f in floor_states)
+
+    # Average freedom index across all monitored zones
+    all_zone_states = [z for f in floor_states for z in f.zones]
+    freedom_scores = [z.freedom_index for z in all_zone_states if z.freedom_index > 0]
+    avg_freedom = float(np.mean(freedom_scores)) if freedom_scores else 0.0
+
+    # Count active alerts (zones with warning/critical status)
+    active_alerts = sum(
+        1 for z in all_zone_states if z.status in ("warning", "critical")
+    )
+
+    logger.info(
+        f"Building state: {total_occ} occupants, {total_energy:.1f} kWh, "
+        f"freedom={avg_freedom:.1f}, alerts={active_alerts}"
+    )
+
+    return BuildingState(
+        timestamp=now,
+        floors=floor_states,
+        total_occupancy=total_occ,
+        total_energy_kwh=round(total_energy, 4),
+        avg_freedom_index=round(avg_freedom, 1),
+        active_alerts=active_alerts,
+    )
+
+
+def _classify_zone_status(
+    temp: float | None,
+    humidity: float | None,
+    co2: float | None,
+    lux: float | None,
+) -> str:
+    """Classify zone status based on comfort metrics.
+
+    Args:
+        temp: Temperature in °C.
+        humidity: Humidity in %.
+        co2: CO2 in ppm.
+        lux: Illuminance in lux.
+
+    Returns:
+        Status: 'optimal', 'acceptable', 'warning', or 'critical'.
+    """
+    statuses = []
+
+    if temp is not None:
+        statuses.append(evaluate_comfort("temperature", temp))
+    if humidity is not None:
+        statuses.append(evaluate_comfort("humidity", humidity))
+    if co2 is not None:
+        statuses.append(evaluate_comfort("co2", co2))
+    if lux is not None:
+        statuses.append(evaluate_comfort("illuminance", lux))
+
+    if not statuses:
+        return "unknown"
+
+    # Return worst status
+    severity_order = {"critical": 3, "warning": 2, "acceptable": 1, "optimal": 0, "unknown": -1}
+    worst = max(statuses, key=lambda s: severity_order.get(s, -1))
+    return worst

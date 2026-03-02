@@ -6,11 +6,11 @@ with the interactive floorplan, key metrics, and recent alerts.
 
 from __future__ import annotations
 
-from dash import html
-from dash_iconify import DashIconify
+from dash import dcc, html
 
-from config.theme import ACCENT_BLUE, TEXT_TERTIARY
+from config.theme import TEXT_TERTIARY
 from views.components.alert_feed import create_alert_feed
+from views.components.insight_card import create_insight_card
 from views.components.kpi_card import create_kpi_card
 
 
@@ -21,6 +21,7 @@ def create_overview_page() -> html.Div:
         Dash html.Div containing the overview page with floorplan,
         KPI grid, and alert feed.
     """
+    # Row 1: 5 KPI cards
     kpi_grid = html.Div(
         [
             create_kpi_card(
@@ -28,80 +29,120 @@ def create_overview_page() -> html.Div:
                 value="—",
                 unit="kWh",
                 icon="mdi:flash",
-                trend=None,
-            ),
-            create_kpi_card(
-                title="Occupancy",
-                value="—",
-                unit="people",
-                icon="mdi:account-group",
-                trend=None,
             ),
             create_kpi_card(
                 title="Avg Temperature",
                 value="—",
                 unit="°C",
                 icon="mdi:thermometer",
-                trend=None,
+            ),
+            create_kpi_card(
+                title="Occupancy",
+                value="—",
+                unit="people",
+                icon="mdi:account-group",
+            ),
+            create_kpi_card(
+                title="Active Alerts",
+                value="—",
+                icon="mdi:alert-circle-outline",
             ),
             create_kpi_card(
                 title="Building Health",
                 value="—",
                 unit="/100",
                 icon="mdi:heart-pulse",
-                trend=None,
             ),
         ],
-        className="grid-4",
+        className="grid-5",
         id="overview-kpi-grid",
     )
 
-    floorplan_placeholder = html.Div(
+    # Row 2 Left: Floor tabs + floorplan graph
+    floor_tabs = html.Div(
         [
-            DashIconify(
-                icon="mdi:floor-plan",
-                width=48,
-                color=TEXT_TERTIARY,
-            ),
-            html.Div(
-                "Interactive floorplan will be rendered here",
-                style={
-                    "marginTop": "12px",
-                    "fontSize": "14px",
-                    "color": TEXT_TERTIARY,
-                },
-            ),
+            html.Button("Piso 0", id="floor-tab-0", className="floor-tab active", n_clicks=0),
+            html.Button("Piso 1", id="floor-tab-1", className="floor-tab", n_clicks=0),
         ],
-        className="card",
-        style={
-            "minHeight": "400px",
-            "display": "flex",
-            "flexDirection": "column",
-            "alignItems": "center",
-            "justifyContent": "center",
-        },
-        id="overview-floorplan",
+        className="floor-tabs",
     )
 
-    main_content = html.Div(
+    floorplan_graph = dcc.Graph(
+        id="floorplan-graph",
+        config={"displayModeBar": False, "staticPlot": False},
+        style={"height": "500px"},
+    )
+
+    legend = html.Div(
         [
+            html.Span("Poor"),
+            html.Div(className="floorplan-legend-gradient"),
+            html.Span("Excellent"),
+            html.Span("— Freedom Index", style={"marginLeft": "8px"}),
+        ],
+        className="floorplan-legend",
+    )
+
+    floorplan_section = html.Div(
+        [floor_tabs, floorplan_graph, legend],
+        className="floorplan-container",
+    )
+
+    # Row 2 Right: Zone detail panel (empty until zone is clicked)
+    zone_panel = html.Div(
+        id="overview-zone-panel",
+        children=[
             html.Div(
-                [floorplan_placeholder],
-                style={"flex": "1"},
-            ),
-            html.Div(
-                [create_alert_feed()],
-                style={"width": "380px", "flexShrink": 0},
+                [
+                    html.Div(
+                        "Click a zone on the floorplan to see details",
+                        style={"color": TEXT_TERTIARY, "fontSize": "14px"},
+                    ),
+                ],
+                className="empty-state",
             ),
         ],
-        style={
-            "display": "flex",
-            "gap": "16px",
-            "marginTop": "16px",
-        },
+        className="zone-detail",
+    )
+
+    main_row = html.Div(
+        [
+            html.Div([floorplan_section], className="overview-floorplan-section"),
+            html.Div([zone_panel], className="overview-zone-section"),
+        ],
+        className="overview-row-main",
+    )
+
+    # Row 3: Alert feed + Latest insight
+    bottom_row = html.Div(
+        [
+            html.Div(
+                id="overview-alert-feed",
+                children=[create_alert_feed()],
+            ),
+            html.Div(
+                id="overview-insight",
+                children=[
+                    create_insight_card(
+                        insight=(
+                            "Building operating within normal parameters. "
+                            "All systems are being monitored by PlantaOS."
+                        ),
+                        category="general",
+                        severity="info",
+                    ),
+                ],
+            ),
+        ],
+        className="overview-row-bottom",
     )
 
     return html.Div(
-        [kpi_grid, main_content],
+        [
+            dcc.Store(id="active-floor-store", data=0),
+            kpi_grid,
+            main_row,
+            bottom_row,
+        ],
         className="page-enter",
     )

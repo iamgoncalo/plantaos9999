@@ -682,3 +682,166 @@ body {
     color: var(--text-primary);
     margin-bottom: var(--space-sm);
 }
+
+/* ── 5-Column Grid ───────────────────────────── */
+.grid-5 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-sm);
+}
+
+/* ── Floor Tabs ──────────────────────────────── */
+.floor-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.floor-tab {
+    padding: 6px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--border-default);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-family: var(--font-primary);
+}
+
+.floor-tab:hover {
+    background: var(--bg-hover);
+}
+
+.floor-tab.active {
+    background: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue);
+}
+
+/* ── Floorplan Container ─────────────────────── */
+.floorplan-container {
+    background: var(--bg-card);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--space-sm);
+}
+
+.floorplan-legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.floorplan-legend-gradient {
+    width: 120px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, #FF3B30, #FF9500, #FFD60A, #34C759);
+}
+
+/* ── Overview Layout ─────────────────────────── */
+.overview-row-main {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.overview-floorplan-section {
+    flex: 7;
+    min-width: 0;
+}
+
+.overview-zone-section {
+    flex: 3;
+    min-width: 280px;
+}
+
+.overview-row-bottom {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.overview-row-bottom > * {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ── Zone Detail Panel (Overview) ────────────── */
+.zone-detail {
+    background: var(--bg-card);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--space-md);
+    height: 100%;
+}
+
+.zone-metric-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.zone-metric-row:last-child {
+    border-bottom: none;
+}
+
+.zone-metric-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.zone-metric-value {
+    font-family: var(--font-data);
+    font-size: 15px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+}
+
+.zone-freedom-score {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--card-radius-sm);
+    margin: 16px 0;
+}
+
+.zone-freedom-number {
+    font-family: var(--font-data);
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.zone-freedom-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+/* ── Freedom Bar ─────────────────────────────── */
+.freedom-bar {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--bg-primary);
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.freedom-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 300ms ease, background 300ms ease;
+}

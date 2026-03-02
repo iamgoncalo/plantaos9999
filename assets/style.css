@@ -1,0 +1,353 @@
+/* ═══════════════════════════════════════════════
+   PlantaOS MVP — Global Styles
+   Apple-inspired light UI design system
+   ═══════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── CSS Variables (mirrors config/theme.py) ── */
+:root {
+    /* Backgrounds */
+    --bg-primary: #FAFAFA;
+    --bg-card: #FFFFFF;
+    --bg-hover: #F5F5F7;
+    --bg-selected: #E8E8ED;
+
+    /* Text */
+    --text-primary: #1D1D1F;
+    --text-secondary: #6E6E73;
+    --text-tertiary: #86868B;
+
+    /* Accent */
+    --accent-blue: #0071E3;
+    --accent-blue-hover: #0077ED;
+    --accent-blue-light: #E1F0FF;
+
+    /* Status */
+    --status-healthy: #34C759;
+    --status-healthy-light: #E8F9EE;
+    --status-warning: #FF9500;
+    --status-warning-light: #FFF4E6;
+    --status-critical: #FF3B30;
+    --status-critical-light: #FFE5E3;
+    --status-info: #5AC8FA;
+
+    /* Borders & Shadows */
+    --border-default: #E5E5EA;
+    --border-light: #F2F2F7;
+    --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    --card-shadow-hover: 0 4px 20px rgba(0, 0, 0, 0.12);
+
+    /* Typography */
+    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-data: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+    /* Spacing (8px grid) */
+    --space-xs: 8px;
+    --space-sm: 16px;
+    --space-md: 24px;
+    --space-lg: 32px;
+    --space-xl: 40px;
+
+    /* Layout */
+    --sidebar-width: 240px;
+    --header-height: 64px;
+    --card-radius: 16px;
+    --card-radius-sm: 12px;
+
+    /* Animation */
+    --transition-default: all 300ms ease;
+    --transition-fast: all 150ms ease;
+}
+
+/* ── Reset & Base ─────────────────────────────── */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-primary);
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Sidebar ──────────────────────────────────── */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: var(--sidebar-width);
+    height: 100vh;
+    background: var(--bg-card);
+    border-right: 1px solid var(--border-default);
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    overflow-y: auto;
+}
+
+.sidebar-brand {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent-blue);
+    margin-bottom: var(--space-lg);
+    letter-spacing: -0.02em;
+}
+
+.sidebar-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--card-radius-sm);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-decoration: none;
+}
+
+.sidebar-nav-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.sidebar-nav-item.active {
+    background: var(--accent-blue-light);
+    color: var(--accent-blue);
+}
+
+/* ── Header ───────────────────────────────────── */
+.header {
+    position: sticky;
+    top: 0;
+    height: var(--header-height);
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-default);
+    padding: 0 var(--space-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 50;
+}
+
+/* ── Content Area ─────────────────────────────── */
+.content {
+    padding: var(--space-md);
+    min-height: calc(100vh - var(--header-height));
+}
+
+/* ── Cards ────────────────────────────────────── */
+.card {
+    background: var(--bg-card);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--space-md);
+    transition: var(--transition-default);
+}
+
+.card:hover {
+    box-shadow: var(--card-shadow-hover);
+}
+
+/* ── KPI Card ─────────────────────────────────── */
+.kpi-card {
+    background: var(--bg-card);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--space-md);
+    text-align: center;
+    transition: var(--transition-default);
+}
+
+.kpi-card:hover {
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-2px);
+}
+
+.kpi-value {
+    font-family: var(--font-data);
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.kpi-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.kpi-trend {
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 8px;
+}
+
+.kpi-trend.up {
+    color: var(--status-healthy);
+}
+
+.kpi-trend.down {
+    color: var(--status-critical);
+}
+
+.kpi-trend.neutral {
+    color: var(--text-tertiary);
+}
+
+/* ── Alert Feed ───────────────────────────────── */
+.alert-item {
+    padding: 12px var(--space-sm);
+    border-left: 3px solid var(--status-info);
+    border-radius: 0 8px 8px 0;
+    margin-bottom: var(--space-xs);
+    background: var(--bg-primary);
+    font-size: 13px;
+    transition: var(--transition-fast);
+}
+
+.alert-item:hover {
+    background: var(--bg-hover);
+}
+
+.alert-item.warning {
+    border-left-color: var(--status-warning);
+}
+
+.alert-item.critical {
+    border-left-color: var(--status-critical);
+}
+
+.alert-item.info {
+    border-left-color: var(--status-info);
+}
+
+/* ── Insight Card ─────────────────────────────── */
+.insight-card {
+    background: var(--bg-card);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--space-md);
+    border-left: 4px solid var(--accent-blue);
+}
+
+.insight-card.warning {
+    border-left-color: var(--status-warning);
+}
+
+.insight-card.critical {
+    border-left-color: var(--status-critical);
+}
+
+/* ── Zone Panel (slide-in overlay) ────────────── */
+.zone-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 400px;
+    height: 100vh;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border-default);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+    padding: var(--space-md);
+    z-index: 200;
+    overflow-y: auto;
+    transition: transform 300ms ease;
+}
+
+/* ── Grid Layout Helpers ──────────────────────── */
+.grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-sm);
+}
+
+.grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-sm);
+}
+
+/* ── Data / Monospace ─────────────────────────── */
+.mono,
+.data-value {
+    font-family: var(--font-data);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Chart Containers ─────────────────────────── */
+.chart-container {
+    background: var(--bg-card);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--space-sm);
+}
+
+.chart-container .js-plotly-plot {
+    border-radius: var(--card-radius-sm);
+}
+
+/* ── Scrollbar Styling ────────────────────────── */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+}
+
+/* ── Utility Classes ──────────────────────────── */
+.text-secondary {
+    color: var(--text-secondary);
+}
+
+.text-tertiary {
+    color: var(--text-tertiary);
+}
+
+.text-accent {
+    color: var(--accent-blue);
+}
+
+.text-healthy {
+    color: var(--status-healthy);
+}
+
+.text-warning {
+    color: var(--status-warning);
+}
+
+.text-critical {
+    color: var(--status-critical);
+}

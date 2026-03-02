@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from dash import dcc, html
 
+from config.theme import SIDEBAR_WIDTH
 from views.components.header import create_header
 from views.components.sidebar import create_sidebar
+from views.components.zone_panel import create_zone_panel
 
 
 def create_layout() -> html.Div:
@@ -23,13 +25,19 @@ def create_layout() -> html.Div:
         [
             dcc.Location(id="url", refresh=False),
             dcc.Store(id="building-state-store", storage_type="memory"),
+            dcc.Interval(
+                id="data-refresh-interval",
+                interval=10 * 1000,
+                n_intervals=0,
+            ),
             create_sidebar(),
             html.Div(
                 [
                     create_header(),
                     html.Div(id="page-content", className="content"),
                 ],
-                style={"marginLeft": "240px"},
+                style={"marginLeft": f"{SIDEBAR_WIDTH}px"},
             ),
+            create_zone_panel(),
         ],
     )

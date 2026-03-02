@@ -12,8 +12,14 @@ from loguru import logger
 
 from config.settings import settings
 from config.theme import MANTINE_THEME
+from data.pipeline import run_pipeline
 from views.callbacks import register_callbacks
 from views.layout import create_layout
+
+# ── Data Pipeline ────────────────────────────
+logger.info("Running data pipeline...")
+run_pipeline(days=settings.SYNTHETIC_DAYS, seed=settings.DATA_SEED)
+logger.info("Data pipeline complete")
 
 # ── App Initialization ────────────────────────
 logger.info("Initializing PlantaOS MVP")

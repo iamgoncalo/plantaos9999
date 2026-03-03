@@ -178,6 +178,64 @@ def create_header(
                 ],
                 style={"position": "relative"},
             ),
+            # User display with role badge and logout
+            html.Div(
+                [
+                    DashIconify(
+                        icon="mdi:account-circle-outline",
+                        width=20,
+                        color=TEXT_SECONDARY,
+                    ),
+                    html.Span(
+                        id="header-user-name",
+                        children="Guest",
+                        style={
+                            "fontSize": "13px",
+                            "fontWeight": 500,
+                            "color": TEXT_SECONDARY,
+                        },
+                    ),
+                    html.Span(
+                        id="header-user-role",
+                        children="",
+                        style={
+                            "fontSize": "11px",
+                            "fontWeight": 500,
+                            "color": ACCENT_BLUE,
+                            "padding": "1px 8px",
+                            "borderRadius": "6px",
+                            "background": "#E1F0FF",
+                        },
+                    ),
+                    html.Button(
+                        DashIconify(
+                            icon="mdi:logout",
+                            width=16,
+                            color=TEXT_TERTIARY,
+                        ),
+                        id="header-logout-btn",
+                        n_clicks=0,
+                        title="Logout",
+                        style={
+                            "background": "none",
+                            "border": "none",
+                            "cursor": "pointer",
+                            "padding": "4px",
+                            "display": "flex",
+                            "alignItems": "center",
+                        },
+                    ),
+                ],
+                id="header-user-section",
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "6px",
+                    "padding": "4px 10px",
+                    "borderRadius": "8px",
+                    "background": "#F2F2F7",
+                },
+            ),
         ],
         className="header-right",
     )

@@ -26,6 +26,10 @@ def register_admin_callbacks(app: object) -> None:
     _register_system_health(app)
     _register_audit_log(app)
     _register_role_settings(app)
+    _register_integrity_panel(app)
+    _register_login(app)
+    _register_logout(app)
+    _register_password_reset(app)
 
 
 def _register_save_settings(app: object) -> None:
@@ -476,3 +480,340 @@ def _register_role_settings(app: object) -> None:
             f"camera={settings_data['camera_enabled']}"
         )
         return settings_data
+
+
+def _register_integrity_panel(app: object) -> None:
+    """Populate Architecture & Integrity card with runtime stack info."""
+
+    @app.callback(
+        Output("admin-integrity-content", "children"),
+        Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
+    )
+    @safe_callback
+    def update_integrity_panel(
+        _n: int,
+        pathname: str | None,
+    ) -> html.Div:
+        """Render runtime stack and dependency information.
+
+        Args:
+            _n: Interval tick count.
+            pathname: Current page URL path.
+
+        Returns:
+            Dash html.Div with integrity data.
+        """
+        if pathname != "/admin":
+            return no_update
+
+        import importlib.metadata
+        import platform
+        from pathlib import Path
+
+        from views.components.kpi_card import create_kpi_card
+
+        # Python version
+        py_version = platform.python_version()
+        py_platform = platform.platform()
+
+        # Dash version
+        try:
+            dash_version = importlib.metadata.version("dash")
+        except importlib.metadata.PackageNotFoundError:
+            dash_version = "unknown"
+
+        # Package count
+        pkg_count = len(list(importlib.metadata.distributions()))
+
+        # Module count (local .py files)
+        project_root = Path(__file__).resolve().parent.parent.parent
+        module_count = 0
+        for py_file in project_root.rglob("*.py"):
+            rel_parts = py_file.relative_to(project_root).parts
+            if any(
+                p.startswith(".")
+                or p == "__pycache__"
+                or p in ("venv", ".venv", "node_modules")
+                for p in rel_parts
+            ):
+                continue
+            module_count += 1
+
+        kpi_row = html.Div(
+            [
+                create_kpi_card(
+                    "Python",
+                    py_version,
+                    icon="mdi:language-python",
+                ),
+                create_kpi_card(
+                    "Dash",
+                    dash_version,
+                    icon="mdi:view-dashboard-outline",
+                ),
+                create_kpi_card(
+                    "Packages",
+                    str(pkg_count),
+                    icon="mdi:package-variant-closed",
+                ),
+                create_kpi_card(
+                    "Modules",
+                    str(module_count),
+                    icon="mdi:file-code-outline",
+                ),
+            ],
+            className="grid-4",
+        )
+
+        detail_rows = [
+            html.Div(
+                [
+                    html.Span(
+                        label,
+                        style={
+                            "fontWeight": 500,
+                            "fontSize": "13px",
+                            "color": "#1D1D1F",
+                            "minWidth": "140px",
+                        },
+                    ),
+                    html.Span(
+                        value,
+                        style={
+                            "fontSize": "13px",
+                            "color": "#6E6E73",
+                            "fontFamily": "JetBrains Mono",
+                        },
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "gap": "16px",
+                    "padding": "6px 0",
+                    "borderBottom": "1px solid #F2F2F7",
+                },
+            )
+            for label, value in [
+                ("Platform", py_platform),
+                ("Implementation", platform.python_implementation()),
+                ("Architecture", platform.machine()),
+            ]
+        ]
+
+        return html.Div(
+            [
+                kpi_row,
+                html.Div(
+                    detail_rows,
+                    style={
+                        "marginTop": "16px",
+                        "borderTop": "1px solid #E5E5EA",
+                        "paddingTop": "12px",
+                    },
+                ),
+            ]
+        )
+
+
+def _register_login(app: object) -> None:
+    """Handle login button click — authenticate and store session."""
+
+    @app.callback(
+        Output("auth-store", "data", allow_duplicate=True),
+        Output("admin-login-feedback", "children"),
+        Input("admin-login-btn", "n_clicks"),
+        State("admin-login-username", "value"),
+        State("admin-login-password", "value"),
+        State("url", "pathname"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def handle_login(
+        n_clicks: int | None,
+        username: str | None,
+        password: str | None,
+        pathname: str | None,
+    ) -> tuple:
+        """Authenticate user and persist session data.
+
+        Args:
+            n_clicks: Login button click count.
+            username: Entered username.
+            password: Entered password.
+            pathname: Current URL path.
+
+        Returns:
+            Tuple of (auth data dict, feedback message).
+        """
+        if not n_clicks:
+            raise PreventUpdate
+        if pathname != "/admin":
+            return no_update, no_update
+
+        if not username or not password:
+            return no_update, html.Span(
+                "Please enter username and password",
+                style={
+                    "fontSize": "13px",
+                    "color": "#FF9500",
+                },
+            )
+
+        from config.auth import authenticate
+
+        user = authenticate(username, password)
+        if user is None:
+            logger.warning(f"Failed login attempt for: {username}")
+            return no_update, html.Span(
+                "Invalid credentials",
+                style={
+                    "fontSize": "13px",
+                    "color": "#FF3B30",
+                },
+            )
+
+        logger.info(f"User logged in: {username}")
+        auth_data = {
+            "username": user.username,
+            "role": user.role.value,
+            "display_name": user.display_name,
+        }
+        return auth_data, html.Span(
+            f"Logged in as {user.display_name} ({user.role.value})",
+            style={
+                "fontSize": "13px",
+                "color": "#34C759",
+            },
+        )
+
+
+def _register_logout(app: object) -> None:
+    """Handle logout button click — clear session."""
+
+    @app.callback(
+        Output("auth-store", "data", allow_duplicate=True),
+        Output("admin-auth-status", "children"),
+        Input("admin-logout-btn", "n_clicks"),
+        State("url", "pathname"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def handle_logout(
+        n_clicks: int | None,
+        pathname: str | None,
+    ) -> tuple:
+        """Clear auth session data.
+
+        Args:
+            n_clicks: Logout button click count.
+            pathname: Current URL path.
+
+        Returns:
+            Tuple of (empty auth dict, status message).
+        """
+        if not n_clicks:
+            raise PreventUpdate
+        if pathname != "/admin":
+            return no_update, no_update
+
+        logger.info("User logged out")
+        return {}, html.Span(
+            "Not logged in",
+            style={
+                "fontSize": "13px",
+                "color": "#86868B",
+            },
+        )
+
+
+def _register_password_reset(app: object) -> None:
+    """Handle password reset from admin panel."""
+
+    @app.callback(
+        Output("admin-reset-feedback", "children"),
+        Input("admin-reset-password-btn", "n_clicks"),
+        State("admin-reset-username", "value"),
+        State("admin-reset-new-password", "value"),
+        State("auth-store", "data"),
+        State("url", "pathname"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def handle_password_reset(
+        n_clicks: int | None,
+        username: str | None,
+        new_password: str | None,
+        auth_data: dict | None,
+        pathname: str | None,
+    ) -> html.Span:
+        """Reset a user password (admin only).
+
+        Args:
+            n_clicks: Reset button click count.
+            username: Target username for reset.
+            new_password: New password to set.
+            auth_data: Current auth session data.
+            pathname: Current URL path.
+
+        Returns:
+            Feedback message span.
+        """
+        if not n_clicks:
+            raise PreventUpdate
+        if pathname != "/admin":
+            return no_update
+
+        from config.auth import (
+            UserRole,
+            check_role,
+            create_reset_token,
+            validate_reset_token,
+        )
+
+        if not check_role(auth_data, UserRole.ADMIN):
+            return html.Span(
+                "Admin login required for password reset",
+                style={
+                    "fontSize": "13px",
+                    "color": "#FF3B30",
+                },
+            )
+
+        if not username or not new_password:
+            return html.Span(
+                "Please enter username and new password",
+                style={
+                    "fontSize": "13px",
+                    "color": "#FF9500",
+                },
+            )
+
+        token = create_reset_token(username)
+        if token is None:
+            return html.Span(
+                f"User '{username}' not found",
+                style={
+                    "fontSize": "13px",
+                    "color": "#FF3B30",
+                },
+            )
+
+        success = validate_reset_token(token, new_password)
+        if success:
+            logger.info(f"Password reset for user: {username}")
+            return html.Span(
+                f"Password updated for {username}",
+                style={
+                    "fontSize": "13px",
+                    "color": "#34C759",
+                },
+            )
+
+        return html.Span(
+            "Password reset failed",
+            style={
+                "fontSize": "13px",
+                "color": "#FF3B30",
+            },
+        )

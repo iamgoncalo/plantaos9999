@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dash import Input, Output, html, no_update
+from dash import Input, Output, State, html, no_update
 from dash_iconify import DashIconify
 
 from config.theme import (
@@ -30,6 +30,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "2 min ago",
         "firmware": "2.1.0",
         "metrics": ["temperature_c", "humidity_pct"],
+        "rssi_dbm": -42,
+        "notes": "",
     },
     {
         "device_id": "SEN-002",
@@ -42,6 +44,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "1 min ago",
         "firmware": "1.8.3",
         "metrics": ["co2_ppm"],
+        "rssi_dbm": -55,
+        "notes": "",
     },
     {
         "device_id": "SEN-003",
@@ -54,6 +58,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "30 sec ago",
         "firmware": "1.2.0",
         "metrics": ["occupancy_count"],
+        "rssi_dbm": -38,
+        "notes": "",
     },
     {
         "device_id": "SEN-004",
@@ -66,6 +72,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "3 min ago",
         "firmware": "1.5.1",
         "metrics": ["illuminance_lux"],
+        "rssi_dbm": -61,
+        "notes": "Near window, may need recalibration",
     },
     {
         "device_id": "SEN-005",
@@ -78,6 +86,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "5 min ago",
         "firmware": "2.0.4",
         "metrics": ["temperature_c"],
+        "rssi_dbm": -72,
+        "notes": "Battery replacement scheduled",
     },
     {
         "device_id": "SEN-006",
@@ -90,6 +100,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "1 min ago",
         "firmware": "3.1.0",
         "metrics": ["temperature_c", "humidity_pct", "co2_ppm"],
+        "rssi_dbm": -45,
+        "notes": "",
     },
     {
         "device_id": "SEN-007",
@@ -102,6 +114,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "1 min ago",
         "firmware": "1.0.2",
         "metrics": ["smoke_detected", "co_ppm"],
+        "rssi_dbm": -40,
+        "notes": "Safety-critical device",
     },
     {
         "device_id": "SEN-008",
@@ -114,6 +128,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "45 min ago",
         "firmware": "1.3.0",
         "metrics": ["humidity_pct"],
+        "rssi_dbm": -88,
+        "notes": "Offline, weak signal",
     },
     {
         "device_id": "SEN-009",
@@ -126,6 +142,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "12 min ago",
         "firmware": "1.1.1",
         "metrics": ["door_open"],
+        "rssi_dbm": -68,
+        "notes": "Connection intermittent",
     },
     {
         "device_id": "SEN-010",
@@ -138,6 +156,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "15 min ago",
         "firmware": "3.0.1",
         "metrics": ["total_kwh"],
+        "rssi_dbm": None,
+        "notes": "Wired connection, check Modbus link",
     },
     {
         "device_id": "SEN-011",
@@ -150,6 +170,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "2 min ago",
         "firmware": "2.2.1",
         "metrics": ["co2_ppm", "temperature_c"],
+        "rssi_dbm": -50,
+        "notes": "",
     },
     {
         "device_id": "SEN-012",
@@ -162,6 +184,8 @@ _SIMULATED_DEVICES: list[dict] = [
         "last_seen": "1 min ago",
         "firmware": "2.0.0",
         "metrics": ["occupancy_count"],
+        "rssi_dbm": -44,
+        "notes": "",
     },
 ]
 
@@ -297,6 +321,43 @@ def _battery_indicator(pct: int | None) -> html.Span:
     )
 
 
+def _rssi_indicator(rssi: int | None) -> html.Span:
+    """Render RSSI signal strength with color coding.
+
+    Args:
+        rssi: RSSI in dBm or None for wired devices.
+
+    Returns:
+        html.Span with RSSI display.
+    """
+    if rssi is None:
+        return html.Span(
+            "N/A",
+            style={
+                "fontSize": "13px",
+                "color": TEXT_TERTIARY,
+                "fontFamily": "JetBrains Mono",
+            },
+        )
+
+    if rssi > -50:
+        color = STATUS_HEALTHY
+    elif rssi > -70:
+        color = STATUS_WARNING
+    else:
+        color = STATUS_CRITICAL
+
+    return html.Span(
+        f"{rssi} dBm",
+        style={
+            "fontSize": "13px",
+            "color": color,
+            "fontWeight": 500,
+            "fontFamily": "JetBrains Mono",
+        },
+    )
+
+
 def register_sensors_callbacks(app: object) -> None:
     """Register all sensor management page callbacks.
 
@@ -306,6 +367,10 @@ def register_sensors_callbacks(app: object) -> None:
     _register_inventory(app)
     _register_kpi_strip(app)
     _register_health_panel(app)
+    _register_health_notifications(app)
+    _register_add_device(app)
+    _register_commission_device(app)
+    _register_remove_device(app)
 
 
 def _register_inventory(app: object) -> None:
@@ -348,8 +413,10 @@ def _register_inventory(app: object) -> None:
             "Zone",
             "Status",
             "Battery",
+            "RSSI",
             "Last Seen",
             "Firmware",
+            "Notes",
         ]
         header = html.Thead(
             html.Tr(
@@ -441,7 +508,15 @@ def _register_inventory(app: object) -> None:
                             style={"padding": "10px 12px"},
                         ),
                         html.Td(
-                            _battery_indicator(device.get("battery_pct")),
+                            _battery_indicator(
+                                device.get("battery_pct"),
+                            ),
+                            style={"padding": "10px 12px"},
+                        ),
+                        html.Td(
+                            _rssi_indicator(
+                                device.get("rssi_dbm"),
+                            ),
                             style={"padding": "10px 12px"},
                         ),
                         html.Td(
@@ -459,6 +534,18 @@ def _register_inventory(app: object) -> None:
                                 "fontSize": "13px",
                                 "color": TEXT_TERTIARY,
                                 "fontFamily": "JetBrains Mono",
+                            },
+                        ),
+                        html.Td(
+                            device.get("notes", ""),
+                            style={
+                                "padding": "10px 12px",
+                                "fontSize": "12px",
+                                "color": TEXT_TERTIARY,
+                                "maxWidth": "160px",
+                                "overflow": "hidden",
+                                "textOverflow": "ellipsis",
+                                "whiteSpace": "nowrap",
                             },
                         ),
                     ],
@@ -667,3 +754,273 @@ def _register_health_panel(app: object) -> None:
             )
 
         return html.Div(issues)
+
+
+def _register_health_notifications(app: object) -> None:
+    """Generate health alert notifications for sensor issues.
+
+    Rules:
+    - Offline > 10 min: alert notification
+    - Battery < 15%: warning notification
+    """
+
+    @app.callback(
+        Output("sensors-health-notifications", "children"),
+        Input("url", "pathname"),
+        Input("sensors-store", "data"),
+    )
+    @safe_callback
+    def render_health_notifications(
+        pathname: str | None,
+        stored_sensors: list | None,
+    ) -> html.Div:
+        """Build notification list for devices with health issues.
+
+        Args:
+            pathname: Current URL path.
+            stored_sensors: Persisted sensor list from store.
+
+        Returns:
+            Dash component with alert/warning notifications.
+        """
+        if pathname != "/sensors":
+            return no_update
+
+        devices = (
+            stored_sensors
+            if stored_sensors and len(stored_sensors) > 0
+            else _SIMULATED_DEVICES
+        )
+
+        notifications: list[html.Div] = []
+        for device in devices:
+            battery = device.get("battery_pct")
+            last_seen = device.get("last_seen", "")
+            minutes = _parse_last_seen_minutes(last_seen)
+            dev_label = f"{device['device_id']} - {device['name']}"
+
+            if minutes > 10:
+                notifications.append(
+                    html.Div(
+                        [
+                            DashIconify(
+                                icon="mdi:alert-circle",
+                                width=16,
+                                color=STATUS_CRITICAL,
+                            ),
+                            html.Span(
+                                f"ALERT: {dev_label} offline for {last_seen}",
+                                style={
+                                    "fontSize": "13px",
+                                    "color": STATUS_CRITICAL,
+                                    "fontWeight": 500,
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "8px",
+                            "padding": "8px 12px",
+                            "background": "#FFE5E3",
+                            "borderRadius": "8px",
+                            "marginBottom": "6px",
+                        },
+                    )
+                )
+
+            if battery is not None and battery < 15:
+                notifications.append(
+                    html.Div(
+                        [
+                            DashIconify(
+                                icon="mdi:battery-low",
+                                width=16,
+                                color=STATUS_WARNING,
+                            ),
+                            html.Span(
+                                f"WARNING: {dev_label} battery at {battery}%",
+                                style={
+                                    "fontSize": "13px",
+                                    "color": STATUS_WARNING,
+                                    "fontWeight": 500,
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "8px",
+                            "padding": "8px 12px",
+                            "background": "#FFF4E6",
+                            "borderRadius": "8px",
+                            "marginBottom": "6px",
+                        },
+                    )
+                )
+
+        if not notifications:
+            return html.Div(
+                "No health notifications",
+                style={
+                    "color": TEXT_TERTIARY,
+                    "fontSize": "13px",
+                    "padding": "8px 0",
+                },
+            )
+
+        return html.Div(notifications)
+
+
+def _register_add_device(app: object) -> None:
+    """Add a new sensor device to the inventory."""
+
+    @app.callback(
+        Output(
+            "sensors-store",
+            "data",
+            allow_duplicate=True,
+        ),
+        Input("sensors-add-btn", "n_clicks"),
+        State("sensors-store", "data"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def add_device(
+        n_clicks: int | None,
+        stored: list | None,
+    ) -> list:
+        """Append a new sensor device to the store.
+
+        Args:
+            n_clicks: Add button click count.
+            stored: Current device list from store.
+
+        Returns:
+            Updated device list with new device appended.
+        """
+        if not n_clicks:
+            return no_update
+        devices = list(stored) if stored else list(_SIMULATED_DEVICES)
+        new_id = f"SEN-{len(devices) + 1:03d}"
+        devices.append(
+            {
+                "device_id": new_id,
+                "name": f"Sensor {new_id}",
+                "type": "multi",
+                "protocol": "Matter",
+                "zone_id": "p0_hall",
+                "status": "commissioning",
+                "battery_pct": 100,
+                "last_seen": "just now",
+                "firmware": "1.0.0",
+                "metrics": ["temperature_c"],
+            }
+        )
+        return devices
+
+
+def _register_commission_device(app: object) -> None:
+    """Commission a device with confirmation dialog.
+
+    Step 1: Button click opens the sensors-commission-confirm dialog.
+    Step 2: Dialog confirmation triggers the actual commission action.
+    """
+
+    @app.callback(
+        Output("sensors-commission-confirm", "displayed"),
+        Input("sensors-commission-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def show_commission_confirm(n_clicks: int | None) -> bool:
+        """Open confirmation dialog before commissioning a device."""
+        return bool(n_clicks)
+
+    @app.callback(
+        Output(
+            "sensors-store",
+            "data",
+            allow_duplicate=True,
+        ),
+        Input("sensors-commission-confirm", "submit_n_clicks"),
+        State("sensors-store", "data"),
+        State("sensors-selected-device", "data"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def commission_device(
+        n_clicks: int | None,
+        stored: list | None,
+        selected_id: str | None,
+    ) -> list:
+        """Set selected device status to online after confirmation.
+
+        Args:
+            n_clicks: Confirm dialog submit click count.
+            stored: Current device list from store.
+            selected_id: Device ID to commission.
+
+        Returns:
+            Updated device list.
+        """
+        if not n_clicks or not selected_id:
+            return no_update
+        devices = list(stored) if stored else list(_SIMULATED_DEVICES)
+        for device in devices:
+            if device.get("device_id") == selected_id:
+                device["status"] = "online"
+                device["last_seen"] = "just now"
+                break
+        return devices
+
+
+def _register_remove_device(app: object) -> None:
+    """Remove a device with confirmation dialog.
+
+    Step 1: Button click opens the sensors-remove-confirm dialog.
+    Step 2: Dialog confirmation triggers the actual removal.
+    """
+
+    @app.callback(
+        Output("sensors-remove-confirm", "displayed"),
+        Input("sensors-remove-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def show_remove_confirm(n_clicks: int | None) -> bool:
+        """Open confirmation dialog before removing a device."""
+        return bool(n_clicks)
+
+    @app.callback(
+        Output(
+            "sensors-store",
+            "data",
+            allow_duplicate=True,
+        ),
+        Input("sensors-remove-confirm", "submit_n_clicks"),
+        State("sensors-store", "data"),
+        State("sensors-selected-device", "data"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def remove_device(
+        n_clicks: int | None,
+        stored: list | None,
+        selected_id: str | None,
+    ) -> list:
+        """Remove selected device from the store after confirmation.
+
+        Args:
+            n_clicks: Confirm dialog submit click count.
+            stored: Current device list from store.
+            selected_id: Device ID to remove.
+
+        Returns:
+            Updated device list without the removed device.
+        """
+        if not n_clicks or not selected_id:
+            return no_update
+        devices = list(stored) if stored else list(_SIMULATED_DEVICES)
+        devices = [d for d in devices if d.get("device_id") != selected_id]
+        return devices

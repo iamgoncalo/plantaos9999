@@ -1,8 +1,8 @@
 """Standalone 2D floorplan view page with keyboard navigation.
 
 Wraps the enhanced 2D floorplan renderer in a full-width layout
-with metric and floor selector controls. Supports arrow-key zone
-navigation (Pokemon Mode) via dash-extensions EventListener.
+with metric and floor selector controls. Supports WASD/arrow-key
+avatar movement with collision detection (Explore Mode).
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from config.theme import (
     TEXT_PRIMARY,
     TEXT_TERTIARY,
 )
+from core.geometry import FLOOR_0_WALKABLE
 
 
 def create_view_2d_page() -> html.Div:
@@ -25,7 +26,7 @@ def create_view_2d_page() -> html.Div:
 
     Returns:
         Dash html.Div containing the 2D floorplan graph with metric
-        and floor selector controls, plus keyboard navigation state.
+        and floor selector controls, plus avatar movement state.
     """
     # Header row with title and icon
     header = html.Div(
@@ -38,7 +39,7 @@ def create_view_2d_page() -> html.Div:
                         color=ACCENT_BLUE,
                     ),
                     html.H2(
-                        "2D Floorplan",
+                        "2D Explore",
                         style={
                             "margin": "0 0 0 8px",
                             "fontSize": "22px",
@@ -55,7 +56,7 @@ def create_view_2d_page() -> html.Div:
                         icon="mdi:keyboard-outline", width=16, color=TEXT_TERTIARY
                     ),
                     html.Span(
-                        "Use arrow keys to navigate zones",
+                        "Use WASD or arrow keys to move avatar",
                         style={"fontSize": "12px", "color": TEXT_TERTIARY},
                     ),
                 ],
@@ -97,9 +98,22 @@ def create_view_2d_page() -> html.Div:
         inline=True,
     )
 
+    # Overlay toggle
+    overlay_selector = dcc.RadioItems(
+        id="view2d-overlay-selector",
+        options=[
+            {"label": "None", "value": "none"},
+            {"label": "Heat", "value": "heat"},
+            {"label": "Alerts", "value": "alerts"},
+        ],
+        value="none",
+        className="time-range-selector",
+        inline=True,
+    )
+
     # Controls row
     controls = html.Div(
-        [metric_selector, floor_selector],
+        [metric_selector, floor_selector, overlay_selector],
         style={
             "display": "flex",
             "alignItems": "center",
@@ -109,11 +123,18 @@ def create_view_2d_page() -> html.Div:
         },
     )
 
-    # Keyboard navigation stores
-    keyboard_stores = html.Div(
+    # Stores for avatar, overlays, walkable polygons, and keyboard
+    stores = html.Div(
         [
             dcc.Store(id="view2d-selected-zone", data=None),
             dcc.Store(id="view2d-keyboard-event", data=None),
+            dcc.Store(id="view2d-avatar-pos", data={"x": 15.15, "y": 9.25}),
+            dcc.Store(id="view2d-overlays", data=[]),
+            dcc.Store(
+                id="view2d-walkable-polys",
+                data=FLOOR_0_WALKABLE,
+            ),
+            dcc.Interval(id="view2d-key-poll", interval=100, disabled=False),
         ]
     )
 
@@ -131,7 +152,7 @@ def create_view_2d_page() -> html.Div:
             [
                 DashIconify(icon="mdi:cursor-pointer", width=20, color=TEXT_TERTIARY),
                 html.Span(
-                    "Click a zone or use arrow keys to select",
+                    "Click a zone or use WASD to explore",
                     style={"fontSize": "13px", "color": TEXT_TERTIARY},
                 ),
             ],
@@ -151,7 +172,7 @@ def create_view_2d_page() -> html.Div:
     )
 
     return html.Div(
-        [keyboard_stores, header, controls, floorplan, zone_detail],
+        [stores, header, controls, floorplan, zone_detail],
         className="page-enter",
         id="view2d-page-container",
         tabIndex="0",

@@ -294,6 +294,153 @@ def create_admin_page() -> html.Div:
                 ],
                 style={"marginBottom": f"{GAP_ELEMENT}px"},
             ),
+            # -- Authentication Section ---------------------------
+            html.Div(
+                [
+                    html.H3(
+                        "Authentication",
+                        style={
+                            "fontSize": "16px",
+                            "fontWeight": 600,
+                            "color": TEXT_PRIMARY,
+                            "marginBottom": "16px",
+                            "marginTop": 0,
+                        },
+                    ),
+                    html.Div(
+                        id="admin-auth-status",
+                        children=html.Span(
+                            "Not logged in",
+                            style={
+                                "fontSize": "13px",
+                                "color": TEXT_TERTIARY,
+                            },
+                        ),
+                    ),
+                    # Login form
+                    html.Div(
+                        [
+                            _input_group(
+                                "Username",
+                                dcc.Input(
+                                    id="admin-login-username",
+                                    type="text",
+                                    placeholder="admin",
+                                    className="admin-input",
+                                ),
+                            ),
+                            _input_group(
+                                "Password",
+                                dcc.Input(
+                                    id="admin-login-password",
+                                    type="password",
+                                    placeholder="Password",
+                                    className="admin-input",
+                                ),
+                            ),
+                            html.Div(
+                                [
+                                    html.Button(
+                                        "Login",
+                                        id="admin-login-btn",
+                                        className="btn-primary",
+                                        n_clicks=0,
+                                    ),
+                                    html.Button(
+                                        "Logout",
+                                        id="admin-logout-btn",
+                                        n_clicks=0,
+                                        style={
+                                            "padding": "8px 20px",
+                                            "background": "#FFFFFF",
+                                            "color": TEXT_SECONDARY,
+                                            "border": ("1px solid #E5E5EA"),
+                                            "borderRadius": "8px",
+                                            "fontSize": "13px",
+                                            "fontWeight": 500,
+                                            "cursor": "pointer",
+                                            "fontFamily": FONT_STACK,
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "display": "flex",
+                                    "gap": "8px",
+                                    "marginBottom": "12px",
+                                },
+                            ),
+                            html.Div(
+                                id="admin-login-feedback",
+                                style={"marginTop": "8px"},
+                            ),
+                        ],
+                        id="admin-login-form",
+                    ),
+                    # Password reset section
+                    html.Div(
+                        [
+                            html.Div(
+                                "Password Reset",
+                                style={
+                                    "fontWeight": 600,
+                                    "fontSize": "14px",
+                                    "color": TEXT_PRIMARY,
+                                    "marginBottom": "8px",
+                                    "marginTop": "16px",
+                                    "borderTop": ("1px solid #E5E5EA"),
+                                    "paddingTop": "16px",
+                                },
+                            ),
+                            _input_group(
+                                "Username to reset",
+                                dcc.Input(
+                                    id="admin-reset-username",
+                                    type="text",
+                                    placeholder="Username",
+                                    className="admin-input",
+                                ),
+                            ),
+                            _input_group(
+                                "New Password",
+                                dcc.Input(
+                                    id="admin-reset-new-password",
+                                    type="password",
+                                    placeholder="New password",
+                                    className="admin-input",
+                                ),
+                            ),
+                            html.Button(
+                                "Reset Password",
+                                id="admin-reset-password-btn",
+                                n_clicks=0,
+                                style={
+                                    "padding": "8px 20px",
+                                    "background": "#FFFFFF",
+                                    "color": STATUS_HEALTHY,
+                                    "border": (f"1px solid {STATUS_HEALTHY}"),
+                                    "borderRadius": "8px",
+                                    "fontSize": "13px",
+                                    "fontWeight": 500,
+                                    "cursor": "pointer",
+                                    "fontFamily": FONT_STACK,
+                                },
+                            ),
+                            html.Div(
+                                id="admin-reset-feedback",
+                                style={"marginTop": "8px"},
+                            ),
+                        ],
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
+                    "marginBottom": f"{GAP_ELEMENT}px",
+                },
+            ),
             # -- Two-column card layout ---------------------------
             html.Div(
                 [
@@ -1042,6 +1189,47 @@ def create_admin_page() -> html.Div:
                                 },
                             ),
                         ],
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
+                    "marginTop": f"{GAP_ELEMENT}px",
+                },
+            ),
+            # -- Architecture & Integrity -----------------------
+            html.Div(
+                [
+                    html.H3(
+                        "Architecture & Integrity",
+                        style={
+                            "fontSize": "16px",
+                            "fontWeight": 600,
+                            "color": TEXT_PRIMARY,
+                            "marginBottom": "12px",
+                            "marginTop": 0,
+                        },
+                    ),
+                    html.P(
+                        "Runtime stack information and dependency inventory.",
+                        style={
+                            "fontSize": "14px",
+                            "color": TEXT_SECONDARY,
+                            "marginBottom": "16px",
+                        },
+                    ),
+                    html.Div(
+                        id="admin-integrity-content",
+                        children=html.Span(
+                            "Loading integrity data...",
+                            style={
+                                "color": TEXT_TERTIARY,
+                                "fontSize": "13px",
+                            },
+                        ),
                     ),
                 ],
                 className="card",

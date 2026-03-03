@@ -7,7 +7,7 @@ organized by page/feature and imported here for centralized registration.
 
 from __future__ import annotations
 
-from dash import Input, Output, State, html, no_update
+from dash import Input, Output, State, dcc, html, no_update
 from dash_iconify import DashIconify
 from loguru import logger
 
@@ -61,6 +61,8 @@ def register_callbacks(app: object) -> None:
     _register_alert_feed_callback(app)
     _register_clientside_header_status(app)
     _register_clientside_sidebar_toggle(app)
+    _register_sidebar_active(app)
+    _register_view_submenu_toggle(app)
     _register_tenant_sync(app)
     _register_search_callback(app)
     # Detail page callbacks
@@ -540,6 +542,70 @@ def _register_clientside_sidebar_toggle(app: object) -> None:
     )
 
 
+def _register_sidebar_active(app: object) -> None:
+    """Clientside callback to update sidebar active nav item on URL change."""
+    app.clientside_callback(
+        """
+        function(pathname) {
+            var map = {
+                '/': 'overview', '/overview': 'overview',
+                '/energy': 'energy', '/comfort': 'comfort',
+                '/occupancy': 'occupancy', '/insights': 'insights',
+                '/simulation': 'simulation', '/reports': 'reports',
+                '/deployment': 'deployment', '/admin': 'admin',
+                '/booking': 'booking',
+                '/view_2d': 'view_2d', '/building_3d': 'building_3d',
+                '/view_4d': 'view_4d'
+            };
+            var activeId = map[pathname] || 'overview';
+            var viewSubs = ['view_2d', 'building_3d', 'view_4d'];
+            var isViewPage = viewSubs.indexOf(activeId) >= 0;
+
+            document.querySelectorAll('.sidebar-nav-item').forEach(function(el) {
+                el.classList.remove('active');
+            });
+            var activeEl = document.getElementById('nav-' + activeId);
+            if (activeEl) activeEl.classList.add('active');
+
+            var viewParent = document.getElementById('nav-view');
+            var submenu = document.getElementById('submenu-view');
+            if (viewParent && submenu) {
+                if (isViewPage) {
+                    viewParent.classList.add('active');
+                    submenu.style.display = 'flex';
+                } else {
+                    viewParent.classList.remove('active');
+                    submenu.style.display = 'none';
+                }
+            }
+            return window.dash_clientside.no_update;
+        }
+        """,
+        Output("sidebar-open-store", "data", allow_duplicate=True),
+        Input("url", "pathname"),
+        prevent_initial_call=True,
+    )
+
+
+def _register_view_submenu_toggle(app: object) -> None:
+    """Clientside callback to expand/collapse View submenu on click."""
+    app.clientside_callback(
+        """
+        function(n) {
+            var sub = document.getElementById('submenu-view');
+            if (sub) {
+                var vis = sub.style.display;
+                sub.style.display = (vis === 'none' || !vis) ? 'flex' : 'none';
+            }
+            return window.dash_clientside.no_update;
+        }
+        """,
+        Output("sidebar-open-store", "data", allow_duplicate=True),
+        Input("nav-view", "n_clicks"),
+        prevent_initial_call=True,
+    )
+
+
 def _register_tenant_sync(app: object) -> None:
     """Sync tenant dropdown and update header building name."""
     app.clientside_callback(
@@ -561,48 +627,129 @@ def _register_tenant_sync(app: object) -> None:
 
 
 def _register_search_callback(app: object) -> None:
-    """Clientside fuzzy search: zone names → navigate, page names → redirect."""
-    app.clientside_callback(
-        """
-        function(searchValue) {
-            if (!searchValue || searchValue.length < 2)
-                return [window.dash_clientside.no_update,
-                        window.dash_clientside.no_update];
-            var q = searchValue.toLowerCase();
-            var pages = {
-                'energy': '/energy', 'comfort': '/comfort',
-                'occupancy': '/occupancy', 'booking': '/booking',
-                'simulation': '/simulation', 'reports': '/reports',
-                'insights': '/insights', 'settings': '/admin',
-                'deployment': '/deployment', '3d': '/building_3d',
-                '2d': '/view_2d', 'overview': '/'
-            };
-            for (var key in pages) {
-                if (key.indexOf(q) >= 0)
-                    return [pages[key],
-                            window.dash_clientside.no_update];
+    """Server-side search with results dropdown + navigation on selection."""
+    from config.building import get_monitored_zones
+
+    # Build search index once at registration time
+    _search_entries: list[dict] = []
+
+    # Pages
+    for path, title in _PAGE_TITLES.items():
+        if path != "/":
+            _search_entries.append(
+                {
+                    "label": title,
+                    "category": "Page",
+                    "href": path,
+                    "floor": None,
+                }
+            )
+
+    # Zones
+    for zone in get_monitored_zones():
+        _search_entries.append(
+            {
+                "label": zone.name,
+                "category": "Zone",
+                "href": "/",
+                "floor": zone.floor,
             }
-            var zones = {
-                'multiusos': 0, 'biblioteca': 0, 'copa': 0,
-                'auditorio': 0, 'informatica': 0, 'formacao': 0,
-                'reuniao': 0, 'hall': 0,
-                'dojo': 1, 'sala a': 1, 'sala b': 1,
-                'sala c': 1, 'sala d': 1, 'reunioes': 1,
-                'arquivo': 1
-            };
-            for (var name in zones) {
-                if (name.indexOf(q) >= 0)
-                    return ['/', zones[name]];
+        )
+
+    # Metrics
+    for metric in [
+        "Temperature",
+        "CO2",
+        "Humidity",
+        "Energy",
+        "Occupancy",
+        "Illuminance",
+    ]:
+        _search_entries.append(
+            {
+                "label": metric,
+                "category": "Metric",
+                "href": "/comfort"
+                if metric in ("Temperature", "CO2", "Humidity")
+                else "/energy"
+                if metric == "Energy"
+                else "/occupancy"
+                if metric == "Occupancy"
+                else "/comfort",
+                "floor": None,
             }
-            return [window.dash_clientside.no_update,
-                    window.dash_clientside.no_update];
-        }
-        """,
-        Output("url", "pathname", allow_duplicate=True),
-        Output("active-floor-store", "data", allow_duplicate=True),
+        )
+
+    @app.callback(
+        Output("search-results-container", "children"),
+        Output("search-results-container", "style"),
         Input("global-search-input", "value"),
         prevent_initial_call=True,
     )
+    @safe_callback
+    def update_search_results(query: str | None) -> tuple:
+        """Return matching search results as clickable items."""
+        if not query or len(query) < 2:
+            return [], {"display": "none"}
+
+        q = query.lower()
+        matches = [
+            e
+            for e in _search_entries
+            if q in e["label"].lower() or q in e["category"].lower()
+        ][:8]
+
+        if not matches:
+            return [
+                html.Div(
+                    "No results found",
+                    style={
+                        "padding": "12px 16px",
+                        "color": "#86868B",
+                        "fontSize": "13px",
+                    },
+                ),
+            ], {"display": "block"}
+
+        items = []
+        for m in matches:
+            badge_color = {
+                "Page": "#0071E3",
+                "Zone": "#34C759",
+                "Metric": "#FF9500",
+            }.get(m["category"], "#86868B")
+
+            items.append(
+                dcc.Link(
+                    html.Div(
+                        [
+                            html.Span(
+                                m["category"],
+                                style={
+                                    "fontSize": "10px",
+                                    "fontWeight": 600,
+                                    "color": "#FFFFFF",
+                                    "background": badge_color,
+                                    "borderRadius": "4px",
+                                    "padding": "2px 6px",
+                                    "flexShrink": 0,
+                                },
+                            ),
+                            html.Span(
+                                m["label"],
+                                style={
+                                    "fontSize": "13px",
+                                    "color": "#1D1D1F",
+                                },
+                            ),
+                        ],
+                        className="search-result-item",
+                    ),
+                    href=m["href"],
+                )
+            )
+
+        return items, {"display": "block"}
 
 
 def _build_alert_message(zone_data: dict, name: str) -> str:

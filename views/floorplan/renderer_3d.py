@@ -618,7 +618,7 @@ def _build_zone_meshes_js(
                 f'    ctx.fillText("\\u20AC{bleed:.2f}/hr", 128, 40);\n'
                 f"    ctx.font = \"16px 'Inter', sans-serif\";\n"
                 f'    ctx.fillStyle = "{freedom_color}";\n'
-                f'    ctx.fillText("F: {freedom:.0f}", 128, 70);\n'
+                f'    ctx.fillText("Score: {freedom:.0f}", 128, 70);\n'
                 f"    var tex = new THREE.CanvasTexture(canvas);\n"
                 f"    tex.minFilter = THREE.LinearFilter;\n"
                 f"    var spriteMat = new THREE.SpriteMaterial({{ map: tex,"

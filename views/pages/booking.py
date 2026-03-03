@@ -1,8 +1,7 @@
-"""Smart Booking & Calendar page — The Temporal Oracle.
+"""Smart Booking page — Room Finder + Analysis.
 
-Users can look back at past events to see exact energy, comfort, and AFI
-metrics, or look forward to simulate future bookings with projected
-temperature, CO2, and cost estimates.
+Primary mode: Find the best room for your needs (Booking.com-style).
+Secondary mode: Analyze a specific room's historical or projected metrics.
 """
 
 from __future__ import annotations
@@ -26,12 +25,26 @@ from config.theme import (
 from views.components.kpi_card import create_kpi_skeleton
 
 
+def _label(text: str) -> html.Label:
+    """Create a form label with consistent styling."""
+    return html.Label(
+        text,
+        style={
+            "fontSize": "13px",
+            "fontWeight": 500,
+            "color": TEXT_SECONDARY,
+            "marginBottom": "6px",
+            "display": "block",
+        },
+    )
+
+
 def create_booking_page() -> html.Div:
     """Create the Smart Booking page layout.
 
     Returns:
-        Dash html.Div containing the booking page with mode toggle,
-        controls, KPI grid, physics chart, and recommendation panel.
+        Dash html.Div containing the booking page with tabs
+        for room finding and room analysis.
     """
     # ── Header ─────────────────────────────────
     page_header = html.Div(
@@ -60,7 +73,7 @@ def create_booking_page() -> html.Div:
                 },
             ),
             html.P(
-                "Plan, analyze, and optimize room bookings.",
+                "Find the best room for your needs, or analyze past and future bookings.",
                 style={
                     "margin": "8px 0 0",
                     "color": TEXT_SECONDARY,
@@ -72,63 +85,27 @@ def create_booking_page() -> html.Div:
         style={"marginBottom": f"{GAP_ELEMENT}px"},
     )
 
-    # ── Mode Toggle ────────────────────────────
-    mode_toggle = html.Div(
+    # ── Tab selector ──────────────────────────
+    tab_selector = html.Div(
         dcc.RadioItems(
-            id="booking-mode",
+            id="booking-tab",
             options=[
-                {"label": "Look Back", "value": "past"},
-                {"label": "Look Forward", "value": "future"},
+                {"label": "Find Room", "value": "find"},
+                {"label": "Analyze Room", "value": "analyze"},
             ],
-            value="past",
+            value="find",
             className="time-range-selector",
             inline=True,
         ),
         className="page-controls",
     )
 
-    # ── Controls Row ───────────────────────────
-    zone_options = [{"label": z.name, "value": z.id} for z in get_monitored_zones()]
-
-    controls_row = html.Div(
+    # ── Shared controls card ──────────────────
+    shared_controls = html.Div(
         [
-            # Zone selector
             html.Div(
                 [
-                    html.Label(
-                        "Zone",
-                        style={
-                            "fontSize": "13px",
-                            "fontWeight": 500,
-                            "color": TEXT_SECONDARY,
-                            "marginBottom": "6px",
-                            "display": "block",
-                        },
-                    ),
-                    dcc.Dropdown(
-                        id="booking-zone-selector",
-                        options=zone_options,
-                        value=zone_options[0]["value"] if zone_options else None,
-                        placeholder="Select a zone",
-                        clearable=False,
-                        style={"fontSize": "13px"},
-                    ),
-                ],
-                style={"flex": "2", "minWidth": "160px"},
-            ),
-            # Date picker
-            html.Div(
-                [
-                    html.Label(
-                        "Date",
-                        style={
-                            "fontSize": "13px",
-                            "fontWeight": 500,
-                            "color": TEXT_SECONDARY,
-                            "marginBottom": "6px",
-                            "display": "block",
-                        },
-                    ),
+                    _label("Date"),
                     dcc.DatePickerSingle(
                         id="booking-date-picker",
                         display_format="YYYY-MM-DD",
@@ -137,19 +114,9 @@ def create_booking_page() -> html.Div:
                 ],
                 style={"flex": "1", "minWidth": "140px"},
             ),
-            # Start hour
             html.Div(
                 [
-                    html.Label(
-                        "Start Hour",
-                        style={
-                            "fontSize": "13px",
-                            "fontWeight": 500,
-                            "color": TEXT_SECONDARY,
-                            "marginBottom": "6px",
-                            "display": "block",
-                        },
-                    ),
+                    _label("Start Time"),
                     dcc.Dropdown(
                         id="booking-time-start",
                         options=[
@@ -162,19 +129,9 @@ def create_booking_page() -> html.Div:
                 ],
                 style={"flex": "1", "minWidth": "100px"},
             ),
-            # Duration
             html.Div(
                 [
-                    html.Label(
-                        "Duration",
-                        style={
-                            "fontSize": "13px",
-                            "fontWeight": 500,
-                            "color": TEXT_SECONDARY,
-                            "marginBottom": "6px",
-                            "display": "block",
-                        },
-                    ),
+                    _label("Duration"),
                     dcc.Dropdown(
                         id="booking-duration",
                         options=[
@@ -190,19 +147,9 @@ def create_booking_page() -> html.Div:
                 ],
                 style={"flex": "1", "minWidth": "90px"},
             ),
-            # People count
             html.Div(
                 [
-                    html.Label(
-                        "People",
-                        style={
-                            "fontSize": "13px",
-                            "fontWeight": 500,
-                            "color": TEXT_SECONDARY,
-                            "marginBottom": "6px",
-                            "display": "block",
-                        },
-                    ),
+                    _label("People"),
                     dcc.Input(
                         id="booking-people",
                         type="number",
@@ -235,68 +182,222 @@ def create_booking_page() -> html.Div:
         },
     )
 
-    # ── Analyze Button ─────────────────────────
-    analyze_btn = html.Button(
+    # ══════════════════════════════════════════
+    # FIND ROOM section
+    # ══════════════════════════════════════════
+    find_controls = html.Div(
         [
-            DashIconify(icon="mdi:magnify", width=18, color="#FFFFFF"),
-            " Analyze",
+            html.Div(
+                [
+                    _label("Floor Preference"),
+                    dcc.Dropdown(
+                        id="booking-floor-pref",
+                        options=[
+                            {"label": "Any Floor", "value": "any"},
+                            {"label": "Piso 0 (Ground)", "value": "0"},
+                            {"label": "Piso 1 (First)", "value": "1"},
+                        ],
+                        value="any",
+                        clearable=False,
+                        style={"fontSize": "13px"},
+                    ),
+                ],
+                style={"flex": "1", "minWidth": "140px"},
+            ),
+            html.Button(
+                [
+                    DashIconify(icon="mdi:magnify", width=18, color="#FFFFFF"),
+                    " Find Rooms",
+                ],
+                id="booking-find-btn",
+                n_clicks=0,
+                style={
+                    "padding": "10px 28px",
+                    "background": ACCENT_BLUE,
+                    "color": "#FFFFFF",
+                    "border": "none",
+                    "borderRadius": "12px",
+                    "fontSize": "14px",
+                    "fontWeight": 600,
+                    "fontFamily": FONT_STACK,
+                    "cursor": "pointer",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "8px",
+                    "transition": "all 300ms ease",
+                    "alignSelf": "flex-end",
+                },
+            ),
         ],
-        id="booking-analyze-btn",
-        n_clicks=0,
-        style={
-            "padding": "12px 32px",
-            "background": ACCENT_BLUE,
-            "color": "#FFFFFF",
-            "border": "none",
-            "borderRadius": "12px",
-            "fontSize": "14px",
-            "fontWeight": 600,
-            "fontFamily": FONT_STACK,
-            "cursor": "pointer",
-            "display": "flex",
-            "alignItems": "center",
-            "justifyContent": "center",
-            "gap": "8px",
-            "transition": "all 300ms ease",
-        },
-    )
-
-    # ── Results: KPI Grid (left) ───────────────
-    kpi_grid = html.Div(
-        id="booking-kpi-grid",
-        children=[create_kpi_skeleton() for _ in range(4)],
-        className="grid-4",
-        style={"flex": "1", "minWidth": 0},
-    )
-
-    # ── Results: Physics Chart (right) ─────────
-    physics_chart = html.Div(
-        dcc.Graph(
-            id="booking-physics-chart",
-            config={
-                "displaylogo": False,
-                "displayModeBar": "hover",
-                "modeBarButtonsToRemove": ["lasso2d", "select2d"],
-            },
-            style={"height": "360px"},
-        ),
-        className="chart-container",
-        style={"flex": "1", "minWidth": 0},
-    )
-
-    # ── Results Two-Column ─────────────────────
-    results_section = html.Div(
-        [kpi_grid, physics_chart],
         style={
             "display": "flex",
             "gap": f"{GAP_ELEMENT}px",
-            "alignItems": "flex-start",
+            "alignItems": "flex-end",
+        },
+    )
+
+    find_results = html.Div(
+        id="booking-results-container",
+        children=html.Div(
+            [
+                DashIconify(
+                    icon="mdi:magnify",
+                    width=32,
+                    color=TEXT_TERTIARY,
+                ),
+                html.P(
+                    "Select your requirements and click Find Rooms to see available options.",
+                    style={
+                        "color": TEXT_TERTIARY,
+                        "fontSize": "13px",
+                        "margin": "8px 0 0",
+                    },
+                ),
+            ],
+            style={
+                "textAlign": "center",
+                "padding": "40px 24px",
+            },
+        ),
+    )
+
+    find_calendar = html.Div(
+        [
+            html.H3(
+                "Today's Bookings",
+                style={
+                    "fontSize": "15px",
+                    "fontWeight": 600,
+                    "color": TEXT_PRIMARY,
+                    "margin": "0 0 12px",
+                },
+            ),
+            dcc.Graph(
+                id="booking-calendar-chart",
+                config={
+                    "displaylogo": False,
+                    "displayModeBar": False,
+                },
+                style={"height": "200px"},
+            ),
+        ],
+        className="card",
+        style={
+            "padding": f"{PADDING_CARD}px",
+            "background": BG_CARD,
+            "borderRadius": CARD_RADIUS,
+            "boxShadow": CARD_SHADOW,
+        },
+    )
+
+    find_section = html.Div(
+        id="booking-find-section",
+        children=[find_controls, find_results, find_calendar],
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": f"{GAP_ELEMENT}px",
+        },
+    )
+
+    # ══════════════════════════════════════════
+    # ANALYZE ROOM section
+    # ══════════════════════════════════════════
+    zone_options = [{"label": z.name, "value": z.id} for z in get_monitored_zones()]
+
+    analyze_controls = html.Div(
+        [
+            html.Div(
+                dcc.RadioItems(
+                    id="booking-mode",
+                    options=[
+                        {"label": "Look Back", "value": "past"},
+                        {"label": "Look Forward", "value": "future"},
+                    ],
+                    value="future",
+                    className="time-range-selector",
+                    inline=True,
+                ),
+                style={"flex": "0 0 auto"},
+            ),
+            html.Div(
+                [
+                    _label("Zone"),
+                    dcc.Dropdown(
+                        id="booking-zone-selector",
+                        options=zone_options,
+                        value=zone_options[0]["value"] if zone_options else None,
+                        placeholder="Select a zone",
+                        clearable=False,
+                        style={"fontSize": "13px"},
+                    ),
+                ],
+                style={"flex": "2", "minWidth": "160px"},
+            ),
+            html.Button(
+                [
+                    DashIconify(icon="mdi:chart-line", width=18, color="#FFFFFF"),
+                    " Analyze",
+                ],
+                id="booking-analyze-btn",
+                n_clicks=0,
+                style={
+                    "padding": "10px 28px",
+                    "background": ACCENT_BLUE,
+                    "color": "#FFFFFF",
+                    "border": "none",
+                    "borderRadius": "12px",
+                    "fontSize": "14px",
+                    "fontWeight": 600,
+                    "fontFamily": FONT_STACK,
+                    "cursor": "pointer",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "8px",
+                    "transition": "all 300ms ease",
+                    "alignSelf": "flex-end",
+                },
+            ),
+        ],
+        style={
+            "display": "flex",
+            "gap": f"{GAP_ELEMENT}px",
+            "alignItems": "flex-end",
             "flexWrap": "wrap",
         },
     )
 
-    # ── Recommendation Panel ───────────────────
-    recommendation = html.Div(
+    analyze_results = html.Div(
+        [
+            html.Div(
+                id="booking-kpi-grid",
+                children=[create_kpi_skeleton() for _ in range(4)],
+                className="grid-4",
+            ),
+            html.Div(
+                dcc.Graph(
+                    id="booking-physics-chart",
+                    config={
+                        "displaylogo": False,
+                        "displayModeBar": "hover",
+                        "modeBarButtonsToRemove": [
+                            "lasso2d",
+                            "select2d",
+                        ],
+                    },
+                    style={"height": "360px"},
+                ),
+                className="chart-container",
+            ),
+        ],
+        style={
+            "display": "flex",
+            "gap": f"{GAP_ELEMENT}px",
+            "flexWrap": "wrap",
+        },
+    )
+
+    analyze_recommendation = html.Div(
         id="booking-recommendation",
         children=html.Div(
             [
@@ -306,7 +407,7 @@ def create_booking_page() -> html.Div:
                     color=TEXT_TERTIARY,
                 ),
                 html.Span(
-                    "Select parameters and click Analyze to get a booking recommendation.",
+                    "Select a zone and click Analyze to get insights.",
                     style={"color": TEXT_TERTIARY, "fontSize": "13px"},
                 ),
             ],
@@ -325,14 +426,37 @@ def create_booking_page() -> html.Div:
         },
     )
 
+    analyze_section = html.Div(
+        id="booking-analyze-section",
+        children=[analyze_controls, analyze_results, analyze_recommendation],
+        style={
+            "display": "none",
+            "flexDirection": "column",
+            "gap": f"{GAP_ELEMENT}px",
+        },
+    )
+
+    # ── Confirm dialog + zone store ───────────
+    confirm_dialog = dcc.ConfirmDialog(
+        id="booking-confirm-dialog",
+        message="Confirm this booking?",
+    )
+    confirm_store = dcc.Store(
+        id="booking-confirm-zone-store",
+        storage_type="memory",
+    )
+    booking_status = html.Div(id="booking-status-msg")
+
     return html.Div(
         [
             page_header,
-            mode_toggle,
-            controls_row,
-            analyze_btn,
-            results_section,
-            recommendation,
+            tab_selector,
+            shared_controls,
+            find_section,
+            analyze_section,
+            confirm_dialog,
+            confirm_store,
+            booking_status,
         ],
         className="page-enter",
         style={

@@ -61,24 +61,34 @@ def create_header(
         className="header-left",
     )
 
-    # Global search bar (Gemini-style)
+    # Global search bar
     search_bar = html.Div(
         [
-            DashIconify(
-                icon="mdi:magnify",
-                width=18,
-                color=TEXT_TERTIARY,
-                style={"flexShrink": 0},
+            html.Div(
+                [
+                    DashIconify(
+                        icon="mdi:magnify",
+                        width=18,
+                        color=TEXT_TERTIARY,
+                        style={"flexShrink": 0},
+                    ),
+                    dcc.Input(
+                        id="global-search-input",
+                        type="text",
+                        placeholder="Search zones, metrics, pages...",
+                        debounce=True,
+                        className="global-search-field",
+                    ),
+                ],
+                className="global-search-bar",
             ),
-            dcc.Input(
-                id="global-search-input",
-                type="text",
-                placeholder="Search zones, metrics, insights...",
-                debounce=True,
-                className="global-search-field",
+            html.Div(
+                id="search-results-container",
+                className="search-results-dropdown",
+                style={"display": "none"},
             ),
         ],
-        className="global-search-bar",
+        style={"position": "relative"},
     )
 
     # Tenant selector dropdown

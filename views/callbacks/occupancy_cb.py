@@ -47,10 +47,16 @@ def register_occupancy_callbacks(app: object) -> None:
 
 
 def _get_occ_data(time_range: str) -> pd.DataFrame | None:
-    """Fetch occupancy data for the selected time range."""
+    """Fetch occupancy data for the selected time range with NaN guard."""
     period = TIME_RANGE_MAP.get(time_range, "today")
     start, end = get_period_range(period)
-    return store.get_time_range("occupancy", start, end)
+    df = store.get_time_range("occupancy", start, end)
+    if df is None or df.empty:
+        return None
+    for col in ["occupant_count", "occupancy_ratio"]:
+        if col in df.columns:
+            df[col] = df[col].ffill().fillna(0)
+    return df
 
 
 def _register_occ_kpis(app: object) -> None:

@@ -24,7 +24,13 @@ class DataStore:
         """Initialize an empty DataStore."""
         self._data: dict[str, pd.DataFrame] = {}
         self._lock = threading.Lock()
+        self._version: int = 0
         logger.debug("DataStore initialized")
+
+    @property
+    def version(self) -> int:
+        """Return the current data version (incremented on each put)."""
+        return self._version
 
     def put(self, name: str, df: pd.DataFrame) -> None:
         """Store a DataFrame under the given name.
@@ -35,6 +41,7 @@ class DataStore:
         """
         with self._lock:
             self._data[name] = df
+            self._version += 1
             logger.debug(f"Stored '{name}': {len(df)} rows, {list(df.columns)}")
 
     def get(self, name: str) -> pd.DataFrame | None:

@@ -179,12 +179,26 @@ def compute_floor_state(floor: int) -> FloorState:
     )
 
 
+_cached_state: BuildingState | None = None
+_cached_version: int = -1
+
+
 def compute_building_state() -> BuildingState:
     """Aggregate all floors into a building-wide state summary.
+
+    Uses a cache keyed on store.version to skip recomputation when
+    the underlying DataFrames haven't changed.
 
     Returns:
         BuildingState with building-level aggregated metrics.
     """
+    global _cached_state, _cached_version  # noqa: PLW0603
+
+    current_version = store.version
+    if _cached_state is not None and _cached_version == current_version:
+        logger.debug("Building state cache hit")
+        return _cached_state
+
     now = datetime.now()
 
     floor_states = [
@@ -214,7 +228,7 @@ def compute_building_state() -> BuildingState:
         f"freedom={avg_freedom:.1f}, alerts={active_alerts}"
     )
 
-    return BuildingState(
+    state = BuildingState(
         timestamp=now,
         floors=floor_states,
         total_occupancy=total_occ,
@@ -222,6 +236,10 @@ def compute_building_state() -> BuildingState:
         avg_freedom_index=round(avg_freedom, 1),
         active_alerts=active_alerts,
     )
+
+    _cached_state = state
+    _cached_version = current_version
+    return state
 
 
 def _classify_zone_status(
@@ -268,46 +286,12 @@ def _classify_zone_status(
 
 
 def _inject_demo_anomalies(floor_states: list[FloorState]) -> None:
-    """Inject random anomalies into zone states for demo visibility.
-
-    Randomly selects 2-3 zones and pushes their metrics into
-    warning/critical range based on DEMO_ANOMALY_RATE.
-
-    Args:
-        floor_states: Floor states to mutate in-place.
-    """
-    all_zones = [z for f in floor_states for z in f.zones]
-    if not all_zones:
-        return
-
-    n_anomalies = random.randint(2, 3)
-    candidates = [z for z in all_zones if z.status not in ("warning", "critical")]
-    targets = random.sample(candidates, min(n_anomalies, len(candidates)))
-
-    for zone in targets:
-        if random.random() > settings.DEMO_ANOMALY_RATE:
-            continue
-        anomaly_type = random.choice(["co2", "temperature", "energy"])
-        if anomaly_type == "co2" and zone.co2_ppm is not None:
-            zone.co2_ppm = random.uniform(1200, 1800)
-            zone.status = "critical"
-            zone.freedom_index = max(10, zone.freedom_index - 40)
-        elif anomaly_type == "temperature" and zone.temperature_c is not None:
-            zone.temperature_c = random.choice(
-                [random.uniform(28, 32), random.uniform(14, 17)]
-            )
-            zone.status = "warning"
-            zone.freedom_index = max(20, zone.freedom_index - 30)
-        elif anomaly_type == "energy":
-            zone.total_energy_kwh *= random.uniform(2.5, 4.0)
-            zone.status = "warning"
-            zone.freedom_index = max(25, zone.freedom_index - 25)
-
-
-def _inject_demo_anomalies(floor_states: list[FloorState]) -> None:
     """Randomly push 2-3 zones to warning/critical for demo visibility.
 
     Mutates zone states in place based on DEMO_ANOMALY_RATE.
+
+    Args:
+        floor_states: Floor states to mutate in-place.
     """
     all_zones = [z for f in floor_states for z in f.zones]
     if not all_zones:
@@ -319,7 +303,6 @@ def _inject_demo_anomalies(floor_states: list[FloorState]) -> None:
     for zone in random.sample(candidates, min(target_count, len(candidates))):
         if random.random() > settings.DEMO_ANOMALY_RATE:
             continue
-        # Pick a random anomaly type
         anomaly = random.choice(["co2", "temp_high", "temp_low"])
         if anomaly == "co2" and zone.co2_ppm is not None:
             zone.co2_ppm = random.uniform(1100, 1500)

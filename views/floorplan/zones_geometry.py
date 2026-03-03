@@ -3,55 +3,222 @@
 Defines the 2D polygon coordinates for each zone, used by both
 the 2D SVG renderer and the 3D view. Coordinates are in meters
 relative to building origin (bottom-left corner of ground floor).
+
+DWG-translated geometry for the HORSE/Renault CFT training building
+in Aveiro. Building bounding box: ~48.4m x 15m per floor.
 """
 
 from __future__ import annotations
 
-# Floor dimensions in meters (approximate)
-FLOOR_WIDTH_M = 35.0
-FLOOR_HEIGHT_M = 25.0
-FLOOR_HEIGHT_3D_M = 3.2  # Floor-to-ceiling height
+from pydantic import BaseModel, Field
 
-# ═══════════════════════════════════════════════
-# Ground Floor (Piso 0) — Zone Polygons
-# ═══════════════════════════════════════════════
-# Coordinates: list of (x, y) tuples in meters
-# Placeholder geometry — to be replaced with actual CAD data
+# Floor dimensions in meters (DWG bounding box)
+FLOOR_WIDTH_M = 48.4
+FLOOR_HEIGHT_M = 15.0
+FLOOR_HEIGHT_3D_M = 3.0  # Floor-to-ceiling height
+
+
+class ZoneGeometry(BaseModel):
+    """Geometry definition for a single building zone."""
+
+    id: str = Field(description="Unique zone identifier matching config/building.py")
+    name: str = Field(description="Human-readable zone name")
+    floor: int = Field(description="Floor number (0 = ground, 1 = first)")
+    points: list[tuple[float, float]] = Field(
+        description="Polygon vertices as (x, y) tuples in meters"
+    )
+    area: float = Field(description="Zone area in square meters")
+    capacity: int = Field(default=0, description="Maximum occupancy")
+
+
+# =====================================================
+# Ground Floor (Piso 0) -- DWG-translated Zone Polygons
+# =====================================================
+_FLOOR_0_ZONE_DEFS: list[ZoneGeometry] = [
+    ZoneGeometry(
+        id="p0_multiusos",
+        name="Sala Multiusos",
+        floor=0,
+        points=[(0, 0), (10, 0), (10, 9.3), (0, 9.3)],
+        area=93.10,
+        capacity=60,
+    ),
+    ZoneGeometry(
+        id="p0_biblioteca",
+        name="Biblioteca/Espolio",
+        floor=0,
+        points=[(10, 0), (15, 0), (15, 9.3), (10, 9.3)],
+        area=46.50,
+        capacity=20,
+    ),
+    ZoneGeometry(
+        id="p0_copa",
+        name="Zona Social / Copa",
+        floor=0,
+        points=[(15, 0), (22, 0), (22, 5), (15, 5)],
+        area=35.10,
+        capacity=15,
+    ),
+    ZoneGeometry(
+        id="p0_hall",
+        name="Hall",
+        floor=0,
+        points=[(22, 0), (30, 0), (30, 5), (22, 5)],
+        area=41.50,
+        capacity=30,
+    ),
+    ZoneGeometry(
+        id="p0_circulacao",
+        name="Circulacao",
+        floor=0,
+        points=[(0, 9.3), (30, 9.3), (30, 11), (0, 11)],
+        area=50.30,
+        capacity=0,
+    ),
+    ZoneGeometry(
+        id="p0_reuniao",
+        name="Sala Reuniao",
+        floor=0,
+        points=[(30, 0), (35, 0), (35, 5), (30, 5)],
+        area=25.10,
+        capacity=12,
+    ),
+    ZoneGeometry(
+        id="p0_informatica",
+        name="Sala Informatica",
+        floor=0,
+        points=[(35, 0), (43.3, 0), (43.3, 5), (35, 5)],
+        area=41.70,
+        capacity=30,
+    ),
+    ZoneGeometry(
+        id="p0_formacao1",
+        name="Sala Formacao 1",
+        floor=0,
+        points=[(0, 11), (10, 11), (10, 15), (0, 15)],
+        area=40.0,
+        capacity=25,
+    ),
+    ZoneGeometry(
+        id="p0_formacao2",
+        name="Sala Formacao 2",
+        floor=0,
+        points=[(10, 11), (20, 11), (20, 15), (10, 15)],
+        area=40.0,
+        capacity=25,
+    ),
+    ZoneGeometry(
+        id="p0_formacao3",
+        name="Sala Formacao 3",
+        floor=0,
+        points=[(20, 11), (30, 11), (30, 15), (20, 15)],
+        area=40.0,
+        capacity=25,
+    ),
+    ZoneGeometry(
+        id="p0_wc",
+        name="WCs",
+        floor=0,
+        points=[(43.3, 0), (48.4, 0), (48.4, 5), (43.3, 5)],
+        area=25.0,
+        capacity=0,
+    ),
+]
+
+# =====================================================
+# First Floor (Piso 1) -- DWG-translated Zone Polygons
+# =====================================================
+_FLOOR_1_ZONE_DEFS: list[ZoneGeometry] = [
+    ZoneGeometry(
+        id="p1_dojo",
+        name="Sala Dojo Seguranca",
+        floor=1,
+        points=[(0, 0), (15, 0), (15, 7.3), (0, 7.3)],
+        area=110.30,
+        capacity=50,
+    ),
+    ZoneGeometry(
+        id="p1_arquivo",
+        name="Arquivo",
+        floor=1,
+        points=[(15, 0), (22.8, 0), (22.8, 7.3), (15, 7.3)],
+        area=57.50,
+        capacity=0,
+    ),
+    ZoneGeometry(
+        id="p1_salagrande",
+        name="Sala Grande",
+        floor=1,
+        points=[(22.8, 0), (30, 0), (30, 5.8), (22.8, 5.8)],
+        area=42.10,
+        capacity=25,
+    ),
+    ZoneGeometry(
+        id="p1_salapequena",
+        name="Sala Pequena",
+        floor=1,
+        points=[(30, 0), (35, 0), (35, 5), (30, 5)],
+        area=25.00,
+        capacity=15,
+    ),
+    ZoneGeometry(
+        id="p1_circulacao",
+        name="Circulacao",
+        floor=1,
+        points=[(0, 7.3), (30, 7.3), (30, 9), (0, 9)],
+        area=46.70,
+        capacity=0,
+    ),
+    ZoneGeometry(
+        id="p1_armazem",
+        name="Exibicao Armazem",
+        floor=1,
+        points=[(35, 0), (40.1, 0), (40.1, 5), (35, 5)],
+        area=25.80,
+        capacity=0,
+    ),
+]
+
+# Build lookup dicts keyed by zone_id -> polygon points (for backward compat)
 FLOOR_0_ZONES: dict[str, list[tuple[float, float]]] = {
-    "p0_sala_multiusos": [(0, 0), (12, 0), (12, 8), (0, 8)],
-    "p0_biblioteca": [(12, 0), (19, 0), (19, 7), (12, 7)],
-    "p0_zona_social": [(19, 0), (25, 0), (25, 6), (19, 6)],
-    "p0_hall": [(0, 8), (7, 8), (7, 14), (0, 14)],
-    "p0_circulacao": [(7, 8), (25, 8), (25, 10), (7, 10)],
-    "p0_aula_camara": [(25, 0), (29, 0), (29, 5), (25, 5)],
-    "p0_formacao_1": [(0, 14), (8, 14), (8, 21), (0, 21)],
-    "p0_formacao_2": [(8, 14), (15, 14), (15, 20), (8, 20)],
-    "p0_formacao_3": [(15, 14), (21, 14), (21, 19), (15, 19)],
-    "p0_reuniao": [(21, 14), (26, 14), (26, 19), (21, 19)],
-    "p0_informatica": [(26, 10), (33, 10), (33, 16), (26, 16)],
-    "p0_auditorio": [(26, 16), (33, 16), (33, 22), (26, 22)],
-    "p0_arrumos": [(0, 21), (4, 21), (4, 24), (0, 24)],
-    "p0_recepcao": [(4, 21), (9, 21), (9, 24), (4, 24)],
-    "p0_wc_m": [(9, 21), (13, 21), (13, 24), (9, 24)],
-    "p0_wc_f": [(13, 21), (17, 21), (17, 24), (13, 24)],
+    z.id: z.points for z in _FLOOR_0_ZONE_DEFS
+}
+FLOOR_1_ZONES: dict[str, list[tuple[float, float]]] = {
+    z.id: z.points for z in _FLOOR_1_ZONE_DEFS
 }
 
-# ═══════════════════════════════════════════════
-# First Floor (Piso 1) — Zone Polygons
-# ═══════════════════════════════════════════════
-FLOOR_1_ZONES: dict[str, list[tuple[float, float]]] = {
-    "p1_arquivo": [(0, 0), (9, 0), (9, 7), (0, 7)],
-    "p1_sala_grande": [(9, 0), (16, 0), (16, 6), (9, 6)],
-    "p1_sala_pequena": [(16, 0), (21, 0), (21, 5), (16, 5)],
-    "p1_sala_1": [(0, 7), (7, 7), (7, 14), (0, 14)],
-    "p1_sala_2": [(7, 7), (13, 7), (13, 13), (7, 13)],
-    "p1_sala_3": [(13, 7), (18, 7), (18, 13), (13, 13)],
-    "p1_circulacao": [(18, 5), (25, 5), (25, 8), (18, 8)],
-    "p1_producao": [(21, 0), (26, 0), (26, 5), (21, 5)],
-    "p1_dojo": [(18, 8), (33, 8), (33, 18), (18, 18)],
-    "p1_wc": [(0, 14), (4, 14), (4, 17), (0, 17)],
-    "p1_monitor": [(4, 14), (8, 14), (8, 18), (4, 18)],
+# Combined lookup for all zone geometry models
+_ALL_ZONE_GEOM: dict[str, ZoneGeometry] = {
+    z.id: z for z in _FLOOR_0_ZONE_DEFS + _FLOOR_1_ZONE_DEFS
 }
+
+
+def get_zones_for_floor(floor: int) -> list[ZoneGeometry]:
+    """Get all zone geometries for a specific floor.
+
+    Args:
+        floor: Floor number (0 or 1).
+
+    Returns:
+        List of ZoneGeometry models for the floor.
+    """
+    if floor == 0:
+        return list(_FLOOR_0_ZONE_DEFS)
+    if floor == 1:
+        return list(_FLOOR_1_ZONE_DEFS)
+    return []
+
+
+def get_zone_geometry(zone_id: str) -> ZoneGeometry | None:
+    """Get the geometry model for a specific zone.
+
+    Args:
+        zone_id: Zone identifier.
+
+    Returns:
+        ZoneGeometry model, or None if not found.
+    """
+    return _ALL_ZONE_GEOM.get(zone_id)
 
 
 def get_zone_polygon(zone_id: str) -> list[tuple[float, float]]:

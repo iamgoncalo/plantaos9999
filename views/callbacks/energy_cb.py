@@ -46,10 +46,23 @@ def register_energy_callbacks(app: object) -> None:
 
 
 def _get_energy_data(time_range: str) -> pd.DataFrame | None:
-    """Fetch energy data for the selected time range."""
+    """Fetch energy data for the selected time range with NaN guard."""
     period = TIME_RANGE_MAP.get(time_range, "today")
     start, end = get_period_range(period)
-    return store.get_time_range("energy", start, end)
+    df = store.get_time_range("energy", start, end)
+    if df is None or df.empty:
+        return None
+    energy_cols = [
+        "total_kwh",
+        "hvac_kwh",
+        "lighting_kwh",
+        "equipment_kwh",
+        "other_kwh",
+    ]
+    for col in energy_cols:
+        if col in df.columns:
+            df[col] = df[col].ffill().fillna(0)
+    return df
 
 
 def _register_energy_kpis(app: object) -> None:
@@ -64,17 +77,30 @@ def _register_energy_kpis(app: object) -> None:
     def update_energy_kpis(time_range: str, _n: int, pathname: str | None) -> list:
         if pathname != "/energy":
             return no_update
-        df = _get_energy_data(time_range)
+
+        _empty = [
+            create_kpi_card("Total Consumption", "—", icon="mdi:flash"),
+            create_kpi_card("vs. Baseline", "—", icon="mdi:chart-line"),
+            create_kpi_card("Peak Hour", "—", icon="mdi:clock-alert-outline"),
+            create_kpi_card("Cost Estimate", "—", icon="mdi:currency-eur"),
+        ]
+
+        try:
+            df = _get_energy_data(time_range)
+        except Exception as e:
+            logger.warning(f"Energy KPI data fetch error: {e}")
+            return _empty
 
         if df is None or df.empty:
-            return [
-                create_kpi_card("Total Consumption", "—", icon="mdi:flash"),
-                create_kpi_card("vs. Baseline", "—", icon="mdi:chart-line"),
-                create_kpi_card("Peak Hour", "—", icon="mdi:clock-alert-outline"),
-                create_kpi_card("Cost Estimate", "—", icon="mdi:currency-eur"),
-            ]
+            return _empty
 
-        # Total kWh
+        try:
+            return _compute_energy_kpis(df)
+        except Exception as e:
+            logger.warning(f"Energy KPIs compute error: {e}")
+            return _empty
+
+    def _compute_energy_kpis(df: pd.DataFrame) -> list:
         total_kwh = df["total_kwh"].sum()
 
         # vs Baseline: compare daily average to 7-day baseline

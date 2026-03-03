@@ -86,11 +86,11 @@ class Building(BaseModel):
 
 
 # ═══════════════════════════════════════════════
-# Ground Floor — Piso 0
+# Ground Floor — Piso 0 (DWG-translated zones)
 # ═══════════════════════════════════════════════
 FLOOR_0_ZONES = [
     Zone(
-        id="p0_sala_multiusos",
+        id="p0_multiusos",
         name="Sala Multiusos",
         floor=0,
         area_m2=93.10,
@@ -99,14 +99,14 @@ FLOOR_0_ZONES = [
     ),
     Zone(
         id="p0_biblioteca",
-        name="Biblioteca / Espólio HORSE",
+        name="Biblioteca / Espolio HORSE",
         floor=0,
         area_m2=46.50,
         capacity=20,
         zone_type=ZoneType.LIBRARY,
     ),
     Zone(
-        id="p0_zona_social",
+        id="p0_copa",
         name="Zona Social / Copa",
         floor=0,
         area_m2=35.10,
@@ -123,7 +123,7 @@ FLOOR_0_ZONES = [
     ),
     Zone(
         id="p0_circulacao",
-        name="Circulação",
+        name="Circulacao",
         floor=0,
         area_m2=50.30,
         capacity=0,
@@ -131,40 +131,8 @@ FLOOR_0_ZONES = [
         has_sensors=False,
     ),
     Zone(
-        id="p0_aula_camara",
-        name="Aula / Câmara",
-        floor=0,
-        area_m2=18.00,
-        capacity=10,
-        zone_type=ZoneType.TRAINING,
-    ),
-    Zone(
-        id="p0_formacao_1",
-        name="Sala de Formação 1",
-        floor=0,
-        area_m2=51.20,
-        capacity=30,
-        zone_type=ZoneType.TRAINING,
-    ),
-    Zone(
-        id="p0_formacao_2",
-        name="Sala de Formação 2",
-        floor=0,
-        area_m2=41.30,
-        capacity=25,
-        zone_type=ZoneType.TRAINING,
-    ),
-    Zone(
-        id="p0_formacao_3",
-        name="Sala de Formação 3",
-        floor=0,
-        area_m2=31.00,
-        capacity=20,
-        zone_type=ZoneType.TRAINING,
-    ),
-    Zone(
         id="p0_reuniao",
-        name="Sala de Reunião",
+        name="Sala Reuniao",
         floor=0,
         area_m2=25.10,
         capacity=12,
@@ -172,53 +140,41 @@ FLOOR_0_ZONES = [
     ),
     Zone(
         id="p0_informatica",
-        name="Sala de Informática",
+        name="Sala Informatica",
         floor=0,
         area_m2=41.70,
         capacity=30,
         zone_type=ZoneType.IT_LAB,
     ),
     Zone(
-        id="p0_auditorio",
-        name="Auditório",
+        id="p0_formacao1",
+        name="Sala Formacao 1",
         floor=0,
-        area_m2=41.70,
-        capacity=27,
-        zone_type=ZoneType.AUDITORIUM,
+        area_m2=40.00,
+        capacity=25,
+        zone_type=ZoneType.TRAINING,
     ),
     Zone(
-        id="p0_arrumos",
-        name="Arrumos",
+        id="p0_formacao2",
+        name="Sala Formacao 2",
         floor=0,
-        area_m2=12.00,
-        capacity=0,
-        zone_type=ZoneType.STORAGE,
-        has_hvac=False,
-        has_sensors=False,
+        area_m2=40.00,
+        capacity=25,
+        zone_type=ZoneType.TRAINING,
     ),
     Zone(
-        id="p0_recepcao",
-        name="Recepção",
+        id="p0_formacao3",
+        name="Sala Formacao 3",
         floor=0,
-        area_m2=15.00,
-        capacity=5,
-        zone_type=ZoneType.RECEPTION,
+        area_m2=40.00,
+        capacity=25,
+        zone_type=ZoneType.TRAINING,
     ),
     Zone(
-        id="p0_wc_m",
-        name="WC Masculino",
+        id="p0_wc",
+        name="WCs",
         floor=0,
-        area_m2=12.00,
-        capacity=0,
-        zone_type=ZoneType.SANITARY,
-        has_hvac=False,
-        has_sensors=False,
-    ),
-    Zone(
-        id="p0_wc_f",
-        name="WC Feminino",
-        floor=0,
-        area_m2=12.00,
+        area_m2=25.00,
         capacity=0,
         zone_type=ZoneType.SANITARY,
         has_hvac=False,
@@ -227,9 +183,17 @@ FLOOR_0_ZONES = [
 ]
 
 # ═══════════════════════════════════════════════
-# First Floor — Piso 1
+# First Floor — Piso 1 (DWG-translated zones)
 # ═══════════════════════════════════════════════
 FLOOR_1_ZONES = [
+    Zone(
+        id="p1_dojo",
+        name="Sala Dojo Seguranca",
+        floor=1,
+        area_m2=110.30,
+        capacity=50,
+        zone_type=ZoneType.DOJO,
+    ),
     Zone(
         id="p1_arquivo",
         name="Arquivo",
@@ -240,7 +204,7 @@ FLOOR_1_ZONES = [
         has_sensors=False,
     ),
     Zone(
-        id="p1_sala_grande",
+        id="p1_salagrande",
         name="Sala Grande",
         floor=1,
         area_m2=42.10,
@@ -248,7 +212,7 @@ FLOOR_1_ZONES = [
         zone_type=ZoneType.TRAINING,
     ),
     Zone(
-        id="p1_sala_pequena",
+        id="p1_salapequena",
         name="Sala Pequena",
         floor=1,
         area_m2=25.00,
@@ -256,32 +220,8 @@ FLOOR_1_ZONES = [
         zone_type=ZoneType.MEETING,
     ),
     Zone(
-        id="p1_sala_1",
-        name="Sala 1",
-        floor=1,
-        area_m2=45.00,
-        capacity=25,
-        zone_type=ZoneType.TRAINING,
-    ),
-    Zone(
-        id="p1_sala_2",
-        name="Sala 2",
-        floor=1,
-        area_m2=38.50,
-        capacity=22,
-        zone_type=ZoneType.TRAINING,
-    ),
-    Zone(
-        id="p1_sala_3",
-        name="Sala 3",
-        floor=1,
-        area_m2=31.20,
-        capacity=18,
-        zone_type=ZoneType.TRAINING,
-    ),
-    Zone(
         id="p1_circulacao",
-        name="Circulação",
+        name="Circulacao",
         floor=1,
         area_m2=46.70,
         capacity=0,
@@ -289,38 +229,12 @@ FLOOR_1_ZONES = [
         has_sensors=False,
     ),
     Zone(
-        id="p1_producao",
-        name="Produção / Exibição Armazém",
+        id="p1_armazem",
+        name="Exibicao Armazem",
         floor=1,
         area_m2=25.80,
-        capacity=10,
-        zone_type=ZoneType.PRODUCTION,
-    ),
-    Zone(
-        id="p1_dojo",
-        name="Sala Dojo Segurança",
-        floor=1,
-        area_m2=110.30,
-        capacity=50,
-        zone_type=ZoneType.DOJO,
-    ),
-    Zone(
-        id="p1_wc",
-        name="WC Piso 1",
-        floor=1,
-        area_m2=14.00,
         capacity=0,
-        zone_type=ZoneType.SANITARY,
-        has_hvac=False,
-        has_sensors=False,
-    ),
-    Zone(
-        id="p1_monitor",
-        name="Área de Monitorização",
-        floor=1,
-        area_m2=18.00,
-        capacity=5,
-        zone_type=ZoneType.OFFICE,
+        zone_type=ZoneType.PRODUCTION,
     ),
 ]
 

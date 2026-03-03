@@ -35,20 +35,15 @@ from views.floorplan.zones_geometry import (
 # Abbreviated names for compact zone labels
 _NAME_SHORT: dict[str, str] = {
     "Sala Multiusos": "Multiusos",
-    "Biblioteca / Espólio HORSE": "Biblioteca",
+    "Biblioteca / Espolio HORSE": "Biblioteca",
     "Zona Social / Copa": "Copa",
-    "Sala de Formação 1": "Form. 1",
-    "Sala de Formação 2": "Form. 2",
-    "Sala de Formação 3": "Form. 3",
-    "Sala de Reunião": "Reunião",
-    "Sala de Informática": "Informática",
-    "Aula / Câmara": "Aula",
-    "Produção / Exibição Armazém": "Produção",
-    "Sala Dojo Segurança": "Dojo",
-    "Área de Monitorização": "Monitor",
-    "WC Masculino": "WC M",
-    "WC Feminino": "WC F",
-    "WC Piso 1": "WC",
+    "Sala Formacao 1": "Form. 1",
+    "Sala Formacao 2": "Form. 2",
+    "Sala Formacao 3": "Form. 3",
+    "Sala Reuniao": "Reuniao",
+    "Sala Informatica": "Informatica",
+    "Exibicao Armazem": "Armazem",
+    "Sala Dojo Seguranca": "Dojo",
     "Sala Grande": "Sala Grande",
     "Sala Pequena": "Sala Peq.",
 }
@@ -205,7 +200,7 @@ def _create_zone_label(
     """
     short_name = _NAME_SHORT.get(name, name)
     if value is not None:
-        text = f"<b>{short_name}</b><br>{int(value)} 👤"
+        text = f"<b>{short_name}</b><br>{int(value)}"
     else:
         text = f"<b>{short_name}</b>"
 
@@ -255,7 +250,7 @@ def _create_hover_trace(
         if hum is not None:
             lines.append(f"Humidity: {hum:.0f}%")
         if co2 is not None:
-            lines.append(f"CO₂: {co2:.0f} ppm")
+            lines.append(f"CO2: {co2:.0f} ppm")
         lines.append(f"Occupancy: {occ}/{cap}")
         lines.append(f"Energy: {energy:.2f} kWh")
         lines.append(f"Freedom Index: {freedom:.0f}/100")

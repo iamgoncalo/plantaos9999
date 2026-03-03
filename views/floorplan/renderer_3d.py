@@ -23,7 +23,6 @@ from utils.colors import interpolate_color, zone_health_to_color
 from views.floorplan.zones_geometry import (
     FLOOR_0_ZONES,
     FLOOR_1_ZONES,
-    FLOOR_HEIGHT_3D_M,
     FLOOR_HEIGHT_M,
     FLOOR_WIDTH_M,
 )
@@ -31,28 +30,32 @@ from views.floorplan.zones_geometry import (
 # Abbreviated names for compact 3D labels (mirrors renderer_2d.py)
 _NAME_SHORT: dict[str, str] = {
     "Sala Multiusos": "Multiusos",
-    "Biblioteca / Espólio HORSE": "Biblioteca",
+    "Biblioteca / Espolio HORSE": "Biblioteca",
     "Zona Social / Copa": "Copa",
-    "Sala de Formação 1": "Form. 1",
-    "Sala de Formação 2": "Form. 2",
-    "Sala de Formação 3": "Form. 3",
-    "Sala de Reunião": "Reunião",
-    "Sala de Informática": "Informática",
-    "Aula / Câmara": "Aula",
-    "Produção / Exibição Armazém": "Produção",
-    "Sala Dojo Segurança": "Dojo",
-    "Área de Monitorização": "Monitor",
-    "WC Masculino": "WC M",
-    "WC Feminino": "WC F",
-    "WC Piso 1": "WC",
+    "Sala Formacao 1": "Form. 1",
+    "Sala Formacao 2": "Form. 2",
+    "Sala Formacao 3": "Form. 3",
+    "Sala Reuniao": "Reuniao",
+    "Sala Informatica": "Informatica",
+    "Exibicao Armazem": "Armazem",
+    "Sala Dojo Seguranca": "Dojo",
     "Sala Grande": "Sala Grande",
     "Sala Pequena": "Sala Peq.",
 }
 
-# Wall height (leaves a gap to the 3.2m ceiling for visual breathing room)
-_WALL_HEIGHT = 2.8
+# Extrusion heights per floor (meters)
+_FLOOR_0_Y_BASE = 0.0
+_FLOOR_0_Y_TOP = 3.0
+_FLOOR_1_Y_BASE = 3.2  # 0.2m slab between floors
+_FLOOR_1_Y_TOP = 6.2
+_WALL_HEIGHT_0 = _FLOOR_0_Y_TOP - _FLOOR_0_Y_BASE  # 3.0m
+_WALL_HEIGHT_1 = _FLOOR_1_Y_TOP - _FLOOR_1_Y_BASE  # 3.0m
+
 # Inset from polygon bounds so adjacent rooms have a visible gap
 _ZONE_PADDING = 0.05
+
+# Default zone material opacity
+_ZONE_OPACITY = 0.85
 
 
 def generate_3d_html(
@@ -73,6 +76,11 @@ def generate_3d_html(
     """
     building_data = building_data or {}
     zone_js = _build_zone_meshes_js(building_data, metric, visible_floors)
+
+    # Camera target at building center, vertically between both floors
+    cam_target_x = FLOOR_WIDTH_M / 2
+    cam_target_z = FLOOR_HEIGHT_M / 2
+    cam_target_y = (_FLOOR_0_Y_TOP + _FLOOR_1_Y_BASE) / 2
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -135,14 +143,14 @@ def generate_3d_html(
 (function() {{
   "use strict";
 
-  // ── Scene setup ──────────────────────────────
+  // -- Scene setup -----------------------------------------
   var scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xf8fafc, 60, 140);
+  scene.fog = new THREE.Fog(0xf8fafc, 80, 180);
 
   var camera = new THREE.PerspectiveCamera(
-    40, window.innerWidth / window.innerHeight, 0.5, 200
+    40, window.innerWidth / window.innerHeight, 0.5, 250
   );
-  camera.position.set(32, 28, 38);
+  camera.position.set(45, 35, 45);
 
   var renderer = new THREE.WebGLRenderer({{
     antialias: true,
@@ -157,30 +165,30 @@ def generate_3d_html(
   renderer.outputEncoding = THREE.sRGBEncoding;
   document.body.appendChild(renderer.domElement);
 
-  // ── Controls ─────────────────────────────────
+  // -- Controls --------------------------------------------
   var controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.minDistance = 12;
-  controls.maxDistance = 85;
+  controls.minDistance = 15;
+  controls.maxDistance = 100;
   controls.maxPolarAngle = Math.PI / 2.2;
-  controls.target.set({FLOOR_WIDTH_M / 2:.1f}, 2, {FLOOR_HEIGHT_M / 2:.1f});
+  controls.target.set({cam_target_x:.1f}, {cam_target_y:.1f}, {cam_target_z:.1f});
   controls.update();
 
-  // ── Lighting ─────────────────────────────────
+  // -- Lighting --------------------------------------------
   var ambient = new THREE.AmbientLight(0xffffff, 0.55);
   scene.add(ambient);
 
   var dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
-  dirLight.position.set(25, 35, 30);
+  dirLight.position.set(35, 45, 40);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.set(2048, 2048);
-  dirLight.shadow.camera.left = -40;
-  dirLight.shadow.camera.right = 40;
-  dirLight.shadow.camera.top = 40;
-  dirLight.shadow.camera.bottom = -40;
+  dirLight.shadow.camera.left = -55;
+  dirLight.shadow.camera.right = 55;
+  dirLight.shadow.camera.top = 30;
+  dirLight.shadow.camera.bottom = -30;
   dirLight.shadow.camera.near = 1;
-  dirLight.shadow.camera.far = 100;
+  dirLight.shadow.camera.far = 120;
   dirLight.shadow.bias = -0.001;
   dirLight.shadow.radius = 4;
   scene.add(dirLight);
@@ -188,8 +196,8 @@ def generate_3d_html(
   var hemiLight = new THREE.HemisphereLight(0xddeeff, 0xffeedd, 0.25);
   scene.add(hemiLight);
 
-  // ── Ground plane ─────────────────────────────
-  var groundGeo = new THREE.PlaneGeometry(60, 50);
+  // -- Ground plane ----------------------------------------
+  var groundGeo = new THREE.PlaneGeometry(70, 40);
   var groundMat = new THREE.MeshStandardMaterial({{
     color: 0xeef1f5,
     roughness: 0.95,
@@ -197,19 +205,19 @@ def generate_3d_html(
   }});
   var ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set({FLOOR_WIDTH_M / 2:.1f}, -0.05, {FLOOR_HEIGHT_M / 2:.1f});
+  ground.position.set({cam_target_x:.1f}, -0.05, {cam_target_z:.1f});
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // ── Grid lines ───────────────────────────────
-  var gridHelper = new THREE.GridHelper(55, 11, 0xd0d5dd, 0xe0e4ea);
-  gridHelper.position.set({FLOOR_WIDTH_M / 2:.1f}, -0.04, {FLOOR_HEIGHT_M / 2:.1f});
+  // -- Grid lines ------------------------------------------
+  var gridHelper = new THREE.GridHelper(65, 13, 0xd0d5dd, 0xe0e4ea);
+  gridHelper.position.set({cam_target_x:.1f}, -0.04, {cam_target_z:.1f});
   scene.add(gridHelper);
 
-  // ── Floor slabs ──────────────────────────────
+  // -- Floor slabs -----------------------------------------
   function addFloorSlab(yPos) {{
     var geo = new THREE.BoxGeometry(
-      {FLOOR_WIDTH_M + 1:.1f}, 0.12, {FLOOR_HEIGHT_M + 1:.1f}
+      {FLOOR_WIDTH_M + 2:.1f}, 0.12, {FLOOR_HEIGHT_M + 2:.1f}
     );
     var mat = new THREE.MeshStandardMaterial({{
       color: 0xf0f2f5,
@@ -219,14 +227,14 @@ def generate_3d_html(
       opacity: 0.9
     }});
     var slab = new THREE.Mesh(geo, mat);
-    slab.position.set({FLOOR_WIDTH_M / 2:.1f}, yPos, {FLOOR_HEIGHT_M / 2:.1f});
+    slab.position.set({cam_target_x:.1f}, yPos, {cam_target_z:.1f});
     slab.receiveShadow = true;
     scene.add(slab);
   }}
-  addFloorSlab(0);
-  addFloorSlab({FLOOR_HEIGHT_3D_M:.1f});
+  addFloorSlab({_FLOOR_0_Y_BASE});
+  addFloorSlab({_FLOOR_1_Y_BASE});
 
-  // ── Zone meshes container ────────────────────
+  // -- Zone meshes container -------------------------------
   var zoneMeshes = [];
   var labelSprites = [];
 
@@ -258,7 +266,7 @@ def generate_3d_html(
     scene.add(mesh);
     zoneMeshes.push(mesh);
 
-    // ── Edges ──
+    // -- Edges --
     var edgeGeo = new THREE.EdgesGeometry(geo);
     var edgeMat = new THREE.LineBasicMaterial({{
       color: 0x999999,
@@ -269,7 +277,7 @@ def generate_3d_html(
     edges.position.copy(mesh.position);
     scene.add(edges);
 
-    // ── Label sprite ──
+    // -- Label sprite --
     if (name && name !== "") {{
       var canvas = document.createElement("canvas");
       canvas.width = 256;
@@ -312,10 +320,10 @@ def generate_3d_html(
     }}
   }}
 
-  // ── Add zone meshes (generated from Python) ──
+  // -- Add zone meshes (generated from Python) -------------
   {zone_js}
 
-  // ── Raycaster (hover) ────────────────────────
+  // -- Raycaster (hover) -----------------------------------
   var raycaster = new THREE.Raycaster();
   var mouse = new THREE.Vector2();
   var tooltip = document.getElementById("tooltip");
@@ -342,12 +350,12 @@ def generate_3d_html(
       html += '<div class="tt-divider"></div>';
       if (m.temperature_c != null)
         html += '<div class="tt-row"><span class="tt-label">Temperature</span>'
-          + '<span class="tt-value">' + m.temperature_c.toFixed(1) + ' °C</span></div>';
+          + '<span class="tt-value">' + m.temperature_c.toFixed(1) + ' C</span></div>';
       if (m.humidity_pct != null)
         html += '<div class="tt-row"><span class="tt-label">Humidity</span>'
           + '<span class="tt-value">' + m.humidity_pct.toFixed(0) + '%</span></div>';
       if (m.co2_ppm != null)
-        html += '<div class="tt-row"><span class="tt-label">CO₂</span>'
+        html += '<div class="tt-row"><span class="tt-label">CO2</span>'
           + '<span class="tt-value">' + m.co2_ppm.toFixed(0) + ' ppm</span></div>';
       if (m.occupant_count != null)
         html += '<div class="tt-row"><span class="tt-label">Occupancy</span>'
@@ -386,14 +394,14 @@ def generate_3d_html(
 
   window.addEventListener("mousemove", onMouseMove, false);
 
-  // ── Window resize ────────────────────────────
+  // -- Window resize ---------------------------------------
   window.addEventListener("resize", function() {{
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   }});
 
-  // ── Animation loop ───────────────────────────
+  // -- Animation loop --------------------------------------
   function animate() {{
     requestAnimationFrame(animate);
     controls.update();
@@ -401,10 +409,10 @@ def generate_3d_html(
   }}
   animate();
 
-  // ── Public API for reset camera ──────────────
+  // -- Public API for reset camera -------------------------
   window.resetCamera = function() {{
-    camera.position.set(32, 28, 38);
-    controls.target.set({FLOOR_WIDTH_M / 2:.1f}, 2, {FLOOR_HEIGHT_M / 2:.1f});
+    camera.position.set(45, 35, 45);
+    controls.target.set({cam_target_x:.1f}, {cam_target_y:.1f}, {cam_target_z:.1f});
     controls.update();
   }};
 
@@ -457,15 +465,20 @@ def _build_zone_meshes_js(
         cx = (x_min + x_max) / 2
         cz = (y_min + y_max) / 2
 
-        # Y offset based on floor
-        y_base = 0.06 if floor_num == 0 else FLOOR_HEIGHT_3D_M + 0.06
+        # Y offset and wall height based on floor
+        if floor_num == 0:
+            y_base = _FLOOR_0_Y_BASE + 0.06
+            wall_h = _WALL_HEIGHT_0 - 0.06
+        else:
+            y_base = _FLOOR_1_Y_BASE + 0.06
+            wall_h = _WALL_HEIGHT_1 - 0.06
 
         # Get metrics and compute color
         zd = building_data.get(zone_id, {})
         color = _get_zone_color(zd, metric)
 
-        # Opacity: floor 1 is slightly transparent in "all" mode
-        opacity = 0.7 if (visible_floors == "all" and floor_num == 1) else 0.88
+        # Material opacity
+        opacity = _ZONE_OPACITY
 
         # Metrics JSON for tooltip
         metrics_json = json.dumps(zd) if zd else "{}"
@@ -476,7 +489,7 @@ def _build_zone_meshes_js(
         lines.append(
             f'  addZone("{zone_id}", "{label}", '
             f"{cx:.2f}, {y_base:.2f}, {cz:.2f}, "
-            f"{w:.2f}, {_WALL_HEIGHT}, {d:.2f}, "
+            f"{w:.2f}, {wall_h:.2f}, {d:.2f}, "
             f'"{color}", {metrics_json}, {opacity});'
         )
 

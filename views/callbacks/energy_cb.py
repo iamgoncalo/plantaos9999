@@ -304,39 +304,43 @@ def _register_energy_breakdown(app: object) -> None:
     ) -> go.Figure:
         if pathname != "/energy":
             return no_update
-        df = _get_energy_data(time_range)
-        if df is None or df.empty:
-            return empty_chart("No energy data available")
+        try:
+            df = _get_energy_data(time_range)
+            if df is None or df.empty:
+                return empty_chart("No energy data available")
 
-        categories = ["hvac_kwh", "lighting_kwh", "equipment_kwh", "other_kwh"]
-        labels = ["HVAC", "Lighting", "Equipment", "Other"]
-        colors = CHART_COLORS[:4]
+            categories = ["hvac_kwh", "lighting_kwh", "equipment_kwh", "other_kwh"]
+            labels = ["HVAC", "Lighting", "Equipment", "Other"]
+            colors = CHART_COLORS[:4]
 
-        # Aggregate by hour
-        hourly = (
-            df.groupby(pd.Grouper(key="timestamp", freq="1h"))[categories]
-            .sum()
-            .reset_index()
-        )
-        hourly = hourly.dropna()
-
-        if hourly.empty:
-            return empty_chart("No energy breakdown data")
-
-        fig = go.Figure()
-        for col, label, color in zip(categories, labels, colors):
-            fig.add_trace(
-                go.Scatter(
-                    x=hourly["timestamp"],
-                    y=hourly[col],
-                    name=label,
-                    stackgroup="one",
-                    line=dict(width=0.5, color=color),
-                )
+            # Aggregate by hour
+            hourly = (
+                df.groupby(pd.Grouper(key="timestamp", freq="1h"))[categories]
+                .sum()
+                .reset_index()
             )
+            hourly = hourly.dropna()
 
-        fig.update_yaxes(title_text="Energy (kWh)")
-        return apply_chart_theme(fig, "Consumption by Category")
+            if hourly.empty:
+                return empty_chart("No energy breakdown data")
+
+            fig = go.Figure()
+            for col, label, color in zip(categories, labels, colors):
+                fig.add_trace(
+                    go.Scatter(
+                        x=hourly["timestamp"],
+                        y=hourly[col],
+                        name=label,
+                        stackgroup="one",
+                        line=dict(width=0.5, color=color),
+                    )
+                )
+
+            fig.update_yaxes(title_text="Energy (kWh)")
+            return apply_chart_theme(fig, "Consumption by Category")
+        except Exception as e:
+            logger.warning(f"Energy breakdown chart error: {e}")
+            return empty_chart("Error loading chart")
 
 
 def _register_energy_heatmap(app: object) -> None:
@@ -353,45 +357,49 @@ def _register_energy_heatmap(app: object) -> None:
     ) -> go.Figure:
         if pathname != "/energy":
             return no_update
-        df = _get_energy_data(time_range)
-        if df is None or df.empty:
-            return empty_chart("No energy data available")
+        try:
+            df = _get_energy_data(time_range)
+            if df is None or df.empty:
+                return empty_chart("No energy data available")
 
-        df = df.copy()
-        df["hour"] = df["timestamp"].dt.hour
+            df = df.copy()
+            df["hour"] = df["timestamp"].dt.hour
 
-        # Only monitored zones
-        monitored_ids = {z.id for z in get_monitored_zones()}
-        df = df[df["zone_id"].isin(monitored_ids)]
+            # Only monitored zones
+            monitored_ids = {z.id for z in get_monitored_zones()}
+            df = df[df["zone_id"].isin(monitored_ids)]
 
-        if df.empty:
-            return empty_chart("No zone energy data")
+            if df.empty:
+                return empty_chart("No zone energy data")
 
-        pivot = df.pivot_table(
-            values="total_kwh",
-            index="zone_id",
-            columns="hour",
-            aggfunc="mean",
-        ).fillna(0)
+            pivot = df.pivot_table(
+                values="total_kwh",
+                index="zone_id",
+                columns="hour",
+                aggfunc="mean",
+            ).fillna(0)
 
-        # Replace zone_ids with short names
-        zone_names = []
-        for zid in pivot.index:
-            z = get_zone_by_id(zid)
-            zone_names.append(z.name if z else zid)
+            # Replace zone_ids with short names
+            zone_names = []
+            for zid in pivot.index:
+                z = get_zone_by_id(zid)
+                zone_names.append(z.name if z else zid)
 
-        fig = go.Figure(
-            go.Heatmap(
-                z=pivot.values,
-                x=[f"{h:02d}:00" for h in pivot.columns],
-                y=zone_names,
-                colorscale=HEATMAP_COLORSCALE,
-                colorbar=dict(title="kWh"),
-                hovertemplate=("%{y}<br>%{x}<br>%{z:.2f} kWh<extra></extra>"),
+            fig = go.Figure(
+                go.Heatmap(
+                    z=pivot.values,
+                    x=[f"{h:02d}:00" for h in pivot.columns],
+                    y=zone_names,
+                    colorscale=HEATMAP_COLORSCALE,
+                    colorbar=dict(title="kWh"),
+                    hovertemplate=("%{y}<br>%{x}<br>%{z:.2f} kWh<extra></extra>"),
+                )
             )
-        )
 
-        return apply_chart_theme(fig, "Zone Energy Heatmap", height=420)
+            return apply_chart_theme(fig, "Zone Energy Heatmap", height=420)
+        except Exception as e:
+            logger.warning(f"Energy heatmap error: {e}")
+            return empty_chart("Error loading chart")
 
 
 def _register_energy_scatter(app: object) -> None:
@@ -408,82 +416,87 @@ def _register_energy_scatter(app: object) -> None:
     ) -> go.Figure:
         if pathname != "/energy":
             return no_update
-        period = TIME_RANGE_MAP.get(time_range, "today")
-        start, end = get_period_range(period)
+        try:
+            period = TIME_RANGE_MAP.get(time_range, "today")
+            start, end = get_period_range(period)
 
-        energy_df = store.get_time_range("energy", start, end)
-        occ_df = store.get_time_range("occupancy", start, end)
+            energy_df = store.get_time_range("energy", start, end)
+            occ_df = store.get_time_range("occupancy", start, end)
 
-        if energy_df is None or occ_df is None or energy_df.empty or occ_df.empty:
-            return empty_chart("No data for energy-occupancy correlation")
+            if energy_df is None or occ_df is None or energy_df.empty or occ_df.empty:
+                return empty_chart("No data for energy-occupancy correlation")
 
-        # Aggregate occupancy to 15-min to match energy resolution
-        occ_agg = (
-            occ_df.groupby([pd.Grouper(key="timestamp", freq="15min"), "zone_id"])[
-                "occupant_count"
-            ]
-            .mean()
-            .reset_index()
-        )
-
-        # Merge
-        merged = energy_df.merge(occ_agg, on=["timestamp", "zone_id"], how="inner")
-
-        if merged.empty:
-            return empty_chart("No overlapping energy-occupancy data")
-
-        # Assign color index per zone
-        zone_ids = merged["zone_id"].unique()
-        zone_color_map = {
-            zid: CHART_COLORS[i % len(CHART_COLORS)] for i, zid in enumerate(zone_ids)
-        }
-        merged["color"] = merged["zone_id"].map(zone_color_map)
-
-        fig = go.Figure()
-
-        # Scatter points
-        for zid in zone_ids[:8]:
-            z = get_zone_by_id(zid)
-            name = z.name if z else zid
-            zdf = merged[merged["zone_id"] == zid]
-            fig.add_trace(
-                go.Scatter(
-                    x=zdf["occupant_count"],
-                    y=zdf["total_kwh"],
-                    mode="markers",
-                    name=name,
-                    marker=dict(
-                        size=5,
-                        opacity=0.5,
-                        color=zone_color_map[zid],
-                    ),
-                    hovertemplate=(
-                        f"{name}<br>"
-                        "Occupancy: %{x:.0f}<br>"
-                        "Energy: %{y:.2f} kWh<extra></extra>"
-                    ),
-                )
+            # Aggregate occupancy to 15-min to match energy resolution
+            occ_agg = (
+                occ_df.groupby([pd.Grouper(key="timestamp", freq="15min"), "zone_id"])[
+                    "occupant_count"
+                ]
+                .mean()
+                .reset_index()
             )
 
-        # OLS trendline across all points
-        x_all = merged["occupant_count"].values
-        y_all = merged["total_kwh"].values
-        valid = ~(np.isnan(x_all) | np.isnan(y_all))
-        if valid.sum() > 2:
-            coeffs = np.polyfit(x_all[valid], y_all[valid], 1)
-            x_line = np.linspace(x_all[valid].min(), x_all[valid].max(), 50)
-            y_line = np.polyval(coeffs, x_line)
-            fig.add_trace(
-                go.Scatter(
-                    x=x_line,
-                    y=y_line,
-                    mode="lines",
-                    name="Trend",
-                    line=dict(color=TEXT_TERTIARY, width=1.5, dash="dash"),
-                    showlegend=False,
-                )
-            )
+            # Merge
+            merged = energy_df.merge(occ_agg, on=["timestamp", "zone_id"], how="inner")
 
-        fig.update_xaxes(title_text="Occupancy (people)")
-        fig.update_yaxes(title_text="Energy (kWh)")
-        return apply_chart_theme(fig, "Energy vs. Occupancy")
+            if merged.empty:
+                return empty_chart("No overlapping energy-occupancy data")
+
+            # Assign color index per zone
+            zone_ids = merged["zone_id"].unique()
+            zone_color_map = {
+                zid: CHART_COLORS[i % len(CHART_COLORS)]
+                for i, zid in enumerate(zone_ids)
+            }
+            merged["color"] = merged["zone_id"].map(zone_color_map)
+
+            fig = go.Figure()
+
+            # Scatter points
+            for zid in zone_ids[:8]:
+                z = get_zone_by_id(zid)
+                name = z.name if z else zid
+                zdf = merged[merged["zone_id"] == zid]
+                fig.add_trace(
+                    go.Scatter(
+                        x=zdf["occupant_count"],
+                        y=zdf["total_kwh"],
+                        mode="markers",
+                        name=name,
+                        marker=dict(
+                            size=5,
+                            opacity=0.5,
+                            color=zone_color_map[zid],
+                        ),
+                        hovertemplate=(
+                            f"{name}<br>"
+                            "Occupancy: %{x:.0f}<br>"
+                            "Energy: %{y:.2f} kWh<extra></extra>"
+                        ),
+                    )
+                )
+
+            # OLS trendline across all points
+            x_all = merged["occupant_count"].values
+            y_all = merged["total_kwh"].values
+            valid = ~(np.isnan(x_all) | np.isnan(y_all))
+            if valid.sum() > 2:
+                coeffs = np.polyfit(x_all[valid], y_all[valid], 1)
+                x_line = np.linspace(x_all[valid].min(), x_all[valid].max(), 50)
+                y_line = np.polyval(coeffs, x_line)
+                fig.add_trace(
+                    go.Scatter(
+                        x=x_line,
+                        y=y_line,
+                        mode="lines",
+                        name="Trend",
+                        line=dict(color=TEXT_TERTIARY, width=1.5, dash="dash"),
+                        showlegend=False,
+                    )
+                )
+
+            fig.update_xaxes(title_text="Occupancy (people)")
+            fig.update_yaxes(title_text="Energy (kWh)")
+            return apply_chart_theme(fig, "Energy vs. Occupancy")
+        except Exception as e:
+            logger.warning(f"Energy scatter chart error: {e}")
+            return empty_chart("Error loading chart")

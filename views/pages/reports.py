@@ -1,4 +1,4 @@
-"""Reports page: financial P&L statements and cost analysis."""
+"""Reports page: financial P&L statements and cost analysis with PDF export."""
 
 from __future__ import annotations
 
@@ -32,7 +32,11 @@ def create_reports_page() -> html.Div:
                                 },
                             ),
                         ],
-                        style={"display": "flex", "alignItems": "center", "gap": "8px"},
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "8px",
+                        },
                     ),
                     html.Div(
                         [
@@ -47,8 +51,39 @@ def create_reports_page() -> html.Div:
                                 className="time-range-selector",
                                 inline=True,
                             ),
+                            html.Button(
+                                [
+                                    DashIconify(
+                                        icon="mdi:file-pdf-box",
+                                        width=18,
+                                        color="#FFFFFF",
+                                    ),
+                                    html.Span(
+                                        "Download PDF",
+                                        style={"marginLeft": "6px"},
+                                    ),
+                                ],
+                                id="reports-download-pdf-btn",
+                                n_clicks=0,
+                                style={
+                                    "display": "inline-flex",
+                                    "alignItems": "center",
+                                    "padding": "8px 16px",
+                                    "borderRadius": "10px",
+                                    "border": "none",
+                                    "background": ACCENT_BLUE,
+                                    "color": "#FFFFFF",
+                                    "fontSize": "13px",
+                                    "fontWeight": 500,
+                                    "cursor": "pointer",
+                                    "fontFamily": (
+                                        "'Inter', -apple-system, sans-serif"
+                                    ),
+                                },
+                            ),
                         ],
                         className="page-controls",
+                        style={"gap": "12px"},
                     ),
                 ],
                 className="page-controls",
@@ -57,7 +92,10 @@ def create_reports_page() -> html.Div:
             html.Div(
                 [
                     create_kpi_card(
-                        title="Total Energy Cost", value="—", unit="€", icon="mdi:flash"
+                        title="Total Energy Cost",
+                        value="—",
+                        unit="€",
+                        icon="mdi:flash",
                     ),
                     create_kpi_card(
                         title="Human Capital Loss",
@@ -95,6 +133,8 @@ def create_reports_page() -> html.Div:
                 ],
                 className="chart-grid",
             ),
+            # PDF download component (hidden)
+            dcc.Download(id="reports-pdf-download"),
         ],
         className="page-enter",
         style={"display": "flex", "flexDirection": "column", "gap": "16px"},

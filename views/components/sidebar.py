@@ -36,6 +36,7 @@ NAV_ITEMS: list[dict] = [
             {"id": "view_4d", "label": "4D Simulation", "icon": "mdi:clock-fast"},
         ],
     },
+    {"id": "booking", "label": "Booking", "icon": "mdi:calendar-clock"},
     {"id": "simulation", "label": "Simulation", "icon": "mdi:play-circle-outline"},
     {"id": "insights", "label": "Insights", "icon": "mdi:lightbulb-on"},
     {"id": "reports", "label": "Reports", "icon": "mdi:file-chart-outline"},

@@ -23,6 +23,9 @@ scipy>=1.12.0
 scikit-learn>=1.4.0
 statsmodels>=0.14.0               # Time series decomposition
 
+# ── Graph / Network Analysis ─────────────────
+networkx>=3.2.0                   # Spatial topology, evacuation routing
+
 # ── AI Insights ───────────────────────────────
 anthropic>=0.39.0                 # Claude API for NL insights
 

@@ -43,6 +43,7 @@ def register_reports_callbacks(app: object) -> None:
     _register_trend_line(app)
     _register_zone_ranking(app)
     _register_savings_chart(app)
+    _register_pdf_download(app)
 
 
 def _register_reports_kpis(app: object) -> None:
@@ -367,3 +368,44 @@ def _register_savings_chart(app: object) -> None:
         except Exception as e:
             logger.warning(f"Reports savings chart error: {e}")
             return empty_chart("Error loading chart")
+
+
+def _register_pdf_download(app: object) -> None:
+    """Download PDF/HTML report when button is clicked."""
+
+    @app.callback(
+        Output("reports-pdf-download", "data"),
+        Input("reports-download-pdf-btn", "n_clicks"),
+        State("reports-period", "value"),
+        State("url", "pathname"),
+        prevent_initial_call=True,
+    )
+    def download_report(
+        n_clicks: int | None, period: str, pathname: str | None
+    ) -> dict | None:
+        if pathname != "/reports" or not n_clicks:
+            return no_update
+        try:
+            from utils.pdf_report import generate_report_html
+
+            html_content = generate_report_html(period=period)
+            period_label = {"today": "today", "7d": "7days", "30d": "30days"}.get(
+                period, "report"
+            )
+            filename = f"plantaos_report_{period_label}.html"
+            return dict(content=html_content, filename=filename, type="text/html")
+        except Exception as e:
+            logger.warning(f"PDF download error: {e}")
+            # Fallback to CSV
+            try:
+                from utils.pdf_report import generate_report_csv
+
+                csv_content = generate_report_csv(period=period)
+                return dict(
+                    content=csv_content,
+                    filename="plantaos_report.csv",
+                    type="text/csv",
+                )
+            except Exception as e2:
+                logger.warning(f"CSV fallback error: {e2}")
+                return no_update

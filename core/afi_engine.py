@@ -7,6 +7,7 @@ Implements the core mathematical framework for spatial intelligence:
 - Swarm Stigmergy: pheromone-based routing optimization
 - Financial Bleed: real-time € cost of building inefficiencies
 - Risk Assessment: catastrophic event cost estimation
+- NetworkX spatial graph for topology analysis and optimal routing
 
 All formulas use numpy/scipy for vectorized computation.
 """
@@ -17,6 +18,7 @@ import math
 from datetime import datetime
 from typing import Any
 
+import networkx as nx
 import numpy as np
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -150,6 +152,154 @@ for _zid, _neighbors in _ZONE_ADJACENCY.items():
         if edge_key not in _seen_edges:
             _seen_edges.add(edge_key)
             _ZONE_EDGES.append((_zid, _n))
+
+
+# ═══════════════════════════════════════════════
+# NetworkX Spatial Graph
+# ═══════════════════════════════════════════════
+
+_SPATIAL_GRAPH: nx.Graph | None = None
+
+
+def build_spatial_graph() -> nx.Graph:
+    """Build a NetworkX graph from zone adjacency data.
+
+    Nodes carry zone metadata (area, capacity, floor).
+    Edges carry inverse-capacity weights for shortest-path routing.
+
+    Returns:
+        Weighted undirected graph of the building topology.
+    """
+    global _SPATIAL_GRAPH
+    if _SPATIAL_GRAPH is not None:
+        return _SPATIAL_GRAPH
+
+    G = nx.Graph()
+
+    for zone_id, neighbors in _ZONE_ADJACENCY.items():
+        zone = get_zone_by_id(zone_id)
+        area = zone.area_m2 if zone else 40.0
+        cap = zone.capacity if zone else 20
+        floor_num = 0 if zone_id.startswith("p0") else 1
+        G.add_node(
+            zone_id,
+            area=area,
+            capacity=cap,
+            floor=floor_num,
+            name=zone.name if zone else zone_id,
+        )
+        for nbr in neighbors:
+            if not G.has_edge(zone_id, nbr):
+                # Weight: inverse capacity means corridors are cheap to traverse
+                nbr_zone = get_zone_by_id(nbr)
+                nbr_cap = nbr_zone.capacity if nbr_zone else 20
+                weight = 1.0 / max(min(cap, nbr_cap), 1)
+                G.add_edge(zone_id, nbr, weight=weight)
+
+    _SPATIAL_GRAPH = G
+    return G
+
+
+def get_shortest_path(
+    source: str,
+    target: str,
+) -> list[str]:
+    """Find shortest path between two zones.
+
+    Args:
+        source: Source zone ID.
+        target: Target zone ID.
+
+    Returns:
+        List of zone IDs along the shortest path.
+    """
+    G = build_spatial_graph()
+    try:
+        return nx.shortest_path(G, source, target, weight="weight")
+    except (nx.NetworkXNoPath, nx.NodeNotFound):
+        return []
+
+
+def get_evacuation_paths(
+    source: str,
+    exit_zones: list[str] | None = None,
+) -> dict[str, list[str]]:
+    """Compute evacuation paths from a zone to all exits.
+
+    Args:
+        source: Starting zone ID.
+        exit_zones: Optional list of exit zone IDs. Defaults to
+            corridors and hall.
+
+    Returns:
+        Dict mapping exit zone → shortest path from source.
+    """
+    if exit_zones is None:
+        exit_zones = ["p0_hall", "p0_circulacao", "p1_circulacao"]
+
+    G = build_spatial_graph()
+    paths: dict[str, list[str]] = {}
+    for exit_zone in exit_zones:
+        try:
+            paths[exit_zone] = nx.shortest_path(G, source, exit_zone, weight="weight")
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            continue
+    return paths
+
+
+def compute_graph_centrality() -> dict[str, float]:
+    """Compute betweenness centrality for all zones.
+
+    Higher centrality = zone is a critical bottleneck/corridor.
+
+    Returns:
+        Dict mapping zone_id → centrality score (0-1).
+    """
+    G = build_spatial_graph()
+    return nx.betweenness_centrality(G, weight="weight")
+
+
+def recommend_optimal_room(
+    people: int,
+    exclude_zones: list[str] | None = None,
+) -> str | None:
+    """Recommend the optimal room for a booking based on capacity and freedom.
+
+    Selects the room with lowest distortion that fits the people count,
+    preferring rooms that are not corridors/WCs.
+
+    Args:
+        people: Number of expected occupants.
+        exclude_zones: Zone IDs to exclude from consideration.
+
+    Returns:
+        Zone ID of the recommended room, or None if none fit.
+    """
+    exclude = set(exclude_zones or [])
+    # Exclude non-bookable zones
+    exclude.update(["p0_circulacao", "p1_circulacao", "p0_wc", "p0_hall"])
+
+    best_zone = None
+    best_score = float("inf")
+
+    for zone_id in _ZONE_ADJACENCY:
+        if zone_id in exclude:
+            continue
+        zone = get_zone_by_id(zone_id)
+        if not zone or zone.capacity < people:
+            continue
+        # Score: lower distortion + less wasted capacity = better
+        try:
+            d_result = compute_distortion(zone_id)
+            wasted = zone.capacity - people
+            score = d_result.D + wasted * 0.01
+            if score < best_score:
+                best_score = score
+                best_zone = zone_id
+        except Exception:
+            continue
+
+    return best_zone
 
 
 # ═══════════════════════════════════════════════

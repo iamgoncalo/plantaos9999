@@ -8,6 +8,7 @@ the user is not on the /view_2d page.
 from __future__ import annotations
 
 from dash import Input, Output, State, no_update
+from loguru import logger
 
 from views.floorplan.renderer_2d import render_floorplan_2d
 
@@ -52,28 +53,32 @@ def _register_floorplan_update(app: object) -> None:
         if pathname != "/view_2d":
             return no_update
 
-        metric = metric or "freedom_index"
-        floor = int(floor_value) if floor_value is not None else 0
+        try:
+            metric = metric or "freedom_index"
+            floor = int(floor_value) if floor_value is not None else 0
 
-        # Extract zone_data from building state
-        zone_data: dict = {}
-        if state_data:
-            for floor_state in state_data.get("floors", []):
-                for zone in floor_state.get("zones", []):
-                    zone_data[zone["zone_id"]] = {
-                        "freedom_index": zone.get("freedom_index", 50),
-                        "temperature_c": zone.get("temperature_c"),
-                        "humidity_pct": zone.get("humidity_pct"),
-                        "co2_ppm": zone.get("co2_ppm"),
-                        "illuminance_lux": zone.get("illuminance_lux"),
-                        "occupant_count": zone.get("occupant_count", 0),
-                        "total_energy_kwh": zone.get("total_energy_kwh", 0),
-                        "financial_bleed": zone.get("financial_bleed", 0),
-                        "status": zone.get("status", "unknown"),
-                    }
+            # Extract zone_data from building state
+            zone_data: dict = {}
+            if state_data:
+                for floor_state in state_data.get("floors", []):
+                    for zone in floor_state.get("zones", []):
+                        zone_data[zone["zone_id"]] = {
+                            "freedom_index": zone.get("freedom_index", 50),
+                            "temperature_c": zone.get("temperature_c"),
+                            "humidity_pct": zone.get("humidity_pct"),
+                            "co2_ppm": zone.get("co2_ppm"),
+                            "illuminance_lux": zone.get("illuminance_lux"),
+                            "occupant_count": zone.get("occupant_count", 0),
+                            "total_energy_kwh": zone.get("total_energy_kwh", 0),
+                            "financial_bleed": zone.get("financial_bleed", 0),
+                            "status": zone.get("status", "unknown"),
+                        }
 
-        return render_floorplan_2d(
-            floor=floor,
-            zone_data=zone_data,
-            metric=metric,
-        )
+            return render_floorplan_2d(
+                floor=floor,
+                zone_data=zone_data,
+                metric=metric,
+            )
+        except Exception as e:
+            logger.warning(f"2D floorplan view callback error: {e}")
+            return no_update

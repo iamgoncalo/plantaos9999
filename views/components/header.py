@@ -1,15 +1,15 @@
-"""Building status header bar.
+"""Building status header bar with global search.
 
-Displays building name, overall status indicator, current time,
-and quick-action buttons. Sits at the top of the content area.
+Displays building name, global search bar, overall status indicator,
+current time, and quick-action buttons. Sits at the top of the content area.
 """
 
 from __future__ import annotations
 
-from dash import html
+from dash import dcc, html
 from dash_iconify import DashIconify
 
-from config.theme import TEXT_SECONDARY
+from config.theme import ACCENT_BLUE, TEXT_SECONDARY, TEXT_TERTIARY
 
 
 def create_header(
@@ -43,8 +43,42 @@ def create_header(
         className="header-left",
     )
 
+    # Global search bar (Gemini-style)
+    search_bar = html.Div(
+        [
+            DashIconify(
+                icon="mdi:magnify",
+                width=18,
+                color=TEXT_TERTIARY,
+                style={"flexShrink": 0},
+            ),
+            dcc.Input(
+                id="global-search-input",
+                type="text",
+                placeholder="Search zones, metrics, insights...",
+                debounce=True,
+                className="global-search-field",
+            ),
+        ],
+        className="global-search-bar",
+    )
+
+    # Tenant badge
+    tenant_badge = html.Span(
+        [
+            DashIconify(
+                icon="mdi:domain",
+                width=14,
+                color=ACCENT_BLUE,
+            ),
+            html.Span("HORSE Renault"),
+        ],
+        className="tenant-badge",
+    )
+
     right = html.Div(
         [
+            tenant_badge,
             html.Span(
                 id="header-clock",
                 children="--:--",
@@ -85,5 +119,5 @@ def create_header(
     return html.Div(
         id="header",
         className="header",
-        children=[left, right],
+        children=[left, search_bar, right],
     )

@@ -29,6 +29,8 @@ def create_layout() -> html.Div:
             dcc.Location(id="url", refresh=False),
             dcc.Store(id="building-state-store", storage_type="memory"),
             dcc.Store(id="sidebar-open-store", storage_type="memory", data=False),
+            dcc.Store(id="tenant-store", storage_type="session", data="horse_renault"),
+            dcc.Store(id="admin-settings-store", storage_type="session"),
             dcc.Interval(
                 id="data-refresh-interval",
                 interval=_REFRESH_MS,

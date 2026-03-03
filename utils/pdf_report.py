@@ -129,11 +129,11 @@ def generate_report_html(
   </div>
   <div class="kpi-box">
     <div class="kpi-value">€{total_human:.0f}</div>
-    <div class="kpi-label">Human Capital Loss</div>
+    <div class="kpi-label">Productivity Impact</div>
   </div>
   <div class="kpi-box">
     <div class="kpi-value">€{total_window:.0f}</div>
-    <div class="kpi-label">Window Penalties</div>
+    <div class="kpi-label">HVAC Waste</div>
   </div>
   <div class="kpi-box">
     <div class="kpi-value savings">€{savings:+.0f}</div>
@@ -143,7 +143,7 @@ def generate_report_html(
 
 <h2>Energy Summary</h2>
 {energy_summary}
-<p>Total financial bleed: <b class="cost">€{total_cost:.2f}</b> over {period_label.lower()}</p>
+<p>Total operating cost: <b class="cost">€{total_cost:.2f}</b> over {period_label.lower()}</p>
 <p>Estimated baseline: €{baseline:.2f} · Savings: <span class="savings">€{savings:.2f}</span></p>
 
 <h2>Cost Breakdown by Zone</h2>
@@ -151,8 +151,8 @@ def generate_report_html(
 <tr>
   <th>Zone</th>
   <th>Energy</th>
-  <th>Human Capital</th>
-  <th>Window Penalty</th>
+  <th>Productivity Impact</th>
+  <th>HVAC Waste</th>
   <th>Total</th>
 </tr>
 {zone_table}
@@ -165,14 +165,14 @@ def generate_report_html(
 </tr>
 </table>
 
-<h2>AFI Framework Context</h2>
-<p>This report uses the Architecture of Freedom Intelligence (AFI) to quantify
-building inefficiencies. Key formulas:</p>
+<h2>Cost Analysis Framework</h2>
+<p>This report quantifies building inefficiencies using sensor data and
+physics-based models. Key cost components:</p>
 <ul>
-  <li><b>Perception (P)</b> = log₂(N) × T — sensor coverage quality</li>
-  <li><b>Distortion (D)</b> = exp(Σ wₖ·ln(dₖ) + Σ γⱼₖ·ln(dⱼ)·ln(dₖ)) — barriers</li>
-  <li><b>Freedom (F)</b> = P / D — spatial health index</li>
-  <li><b>Financial Bleed</b> = Energy + Window Penalty + Human Capital Loss</li>
+  <li><b>Energy Cost</b> — direct electricity consumption × €/kWh rate</li>
+  <li><b>HVAC Waste</b> — thermal losses from open windows and suboptimal setpoints</li>
+  <li><b>Productivity Impact</b> — comfort deviation × occupants × wage × impact factor</li>
+  <li><b>Operating Cost</b> = Energy + HVAC Waste + Productivity Impact</li>
 </ul>
 
 <div class="footer">
@@ -194,7 +194,7 @@ def generate_report_csv(period: str = "today") -> str:
         CSV string with zone cost breakdown.
     """
     period_hours = {"today": 24.0, "7d": 168.0, "30d": 720.0}.get(period, 24.0)
-    lines = ["Zone,Energy (€),Human Capital (€),Window Penalty (€),Total (€)"]
+    lines = ["Zone,Energy (€),Productivity Impact (€),HVAC Waste (€),Total (€)"]
 
     zones = get_monitored_zones()
     for zone_obj in zones:

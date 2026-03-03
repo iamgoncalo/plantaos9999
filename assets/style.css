@@ -1478,3 +1478,109 @@ body {
 .zone-pulse-critical {
     animation: zone-pulse 1s ease-in-out infinite;
 }
+
+/* ═══ Tenant Dropdown ═══ */
+.tenant-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tenant-dropdown {
+    width: 160px;
+    font-size: 13px;
+}
+
+.tenant-dropdown .Select-control {
+    border-radius: 20px !important;
+    min-height: 30px;
+    border-color: #E5E5EA !important;
+}
+
+.tenant-dropdown .Select-value-label {
+    font-size: 13px !important;
+    font-weight: 500;
+}
+
+/* ═══ Alert Slide-in Animation ═══ */
+@keyframes alert-slide-in {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.alert-item {
+    animation: alert-slide-in 300ms ease forwards;
+}
+
+.alert-item:nth-child(2) { animation-delay: 50ms; }
+.alert-item:nth-child(3) { animation-delay: 100ms; }
+.alert-item:nth-child(4) { animation-delay: 150ms; }
+.alert-item:nth-child(5) { animation-delay: 200ms; }
+
+/* ═══ Admin Page ═══ */
+.admin-input-group {
+    margin-bottom: 20px;
+}
+
+.admin-input-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary, #6E6E73);
+    margin-bottom: 6px;
+}
+
+.admin-input-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #E5E5EA;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: border-color 0.2s ease;
+}
+
+.admin-input-group input:focus {
+    outline: none;
+    border-color: #0071E3;
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
+}
+
+.btn-primary {
+    background: #0071E3;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-primary:hover {
+    background: #0060c0;
+}
+
+.admin-tenant-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.admin-tenant-table th {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 2px solid #E5E5EA;
+    color: #6E6E73;
+    font-weight: 500;
+}
+
+.admin-tenant-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #F2F2F7;
+}
+
+.admin-tenant-table tr:last-child td {
+    border-bottom: none;
+}

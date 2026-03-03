@@ -1,6 +1,6 @@
 """Color interpolation and zone-to-color mapping.
 
-Maps Freedom Index scores (0-100) and comfort metrics to the
+Maps Building Health scores (0-100) and comfort metrics to the
 design system color palette for consistent visualization.
 """
 
@@ -90,7 +90,7 @@ def interpolate_color(
 
 
 def zone_health_to_color(score: float) -> str:
-    """Map a Freedom Index score (0-100) to a status color.
+    """Map a Building Health score (0-100) to a status color.
 
     Args:
         score: Zone health score from 0 (poor) to 100 (excellent).

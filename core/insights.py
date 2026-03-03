@@ -125,6 +125,9 @@ def generate_building_insights(
 ) -> list[Insight]:
     """Scan building state for anomalous zones and generate insights.
 
+    Uses mock engine when API key is not configured, otherwise
+    attempts the Claude API with fallback to templates.
+
     Args:
         building_state_data: Building state dict from
             BuildingState.model_dump(mode="json").
@@ -132,6 +135,11 @@ def generate_building_insights(
     Returns:
         List of Insight models for zones with warning/critical status.
     """
+    # Use mock engine when API key is not available
+    if not settings.ANTHROPIC_API_KEY:
+        logger.debug("No API key configured, using mock insight engine")
+        return _generate_mock_insights(building_state_data)
+
     insights: list[Insight] = []
     now_str = datetime.now().isoformat()
 
@@ -247,15 +255,16 @@ def answer_building_question(
         f"and metrics where relevant."
     )
 
+    # Use mock chat when API key is not available
+    if not settings.ANTHROPIC_API_KEY:
+        logger.debug("No API key configured, using mock chat engine")
+        return _mock_chat_response(question, building_state)
+
     try:
         return _call_claude_api(prompt)
     except Exception as e:
         logger.debug(f"Chat API unavailable: {e}")
-        return (
-            "I'm unable to process your question right now. "
-            "Please check the dashboard for current building data, "
-            "or try again in a few minutes."
-        )
+        return _mock_chat_response(question, building_state)
 
 
 def generate_daily_summary(target_date: date | None = None) -> str:
@@ -368,6 +377,338 @@ def generate_zone_analysis(zone_id: str) -> str:
         return _call_claude_api(prompt)
     except Exception:
         return "\n".join(parts)
+
+
+# ── Mock engine (no API key) ────────────────────────
+
+
+def _generate_mock_insights(state_data: dict) -> list[Insight]:
+    """Pattern-match on building state to generate realistic insights.
+
+    Scans zone data for comfort, energy, and occupancy anomalies and
+    produces data-aware insight objects without calling the API.
+
+    Args:
+        state_data: Building state dict from BuildingState.model_dump().
+
+    Returns:
+        Up to 5 Insight models, prioritized critical > warning > info.
+    """
+    now_str = datetime.now().isoformat()
+    candidates: list[Insight] = []
+
+    try:
+        for floor_state in state_data.get("floors", []):
+            for zone in floor_state.get("zones", []):
+                zone_id = zone.get("zone_id", "unknown")
+                zone_info = get_zone_by_id(zone_id)
+                zone_name = zone_info.name if zone_info else zone_id
+                capacity = zone_info.capacity if zone_info else 0
+
+                co2 = zone.get("co2_ppm")
+                temp = zone.get("temperature_c")
+                energy = zone.get("total_energy_kwh", 0.0)
+                occ = zone.get("occupant_count", 0)
+                status = zone.get("status", "unknown")
+
+                # High CO2
+                if co2 is not None and co2 > 1000:
+                    candidates.append(
+                        Insight(
+                            title=f"Elevated CO2 in {zone_name}",
+                            explanation=(
+                                f"CO2 levels in {zone_name} have reached "
+                                f"{co2:.0f} ppm, exceeding the 1000 ppm threshold. "
+                                f"Increase ventilation rate or reduce occupancy."
+                            ),
+                            severity="warning",
+                            affected_zones=[zone_id],
+                            recommended_action=(
+                                "Increase mechanical ventilation or open windows "
+                                "to improve air circulation."
+                            ),
+                            category="comfort",
+                            timestamp=now_str,
+                        )
+                    )
+
+                # Temperature out of range
+                if temp is not None and (temp > 26 or temp < 18):
+                    if temp > 30 or temp < 15:
+                        sev = "critical"
+                    else:
+                        sev = "warning"
+                    if temp > 26:
+                        action = "Reduce HVAC setpoint or check cooling system."
+                    else:
+                        action = "Increase HVAC setpoint or check heating system."
+                    candidates.append(
+                        Insight(
+                            title=f"Temperature alert in {zone_name}",
+                            explanation=(
+                                f"{zone_name} temperature is {temp:.1f} C, "
+                                f"outside the optimal 20-24 C range. {action}"
+                            ),
+                            severity=sev,
+                            affected_zones=[zone_id],
+                            recommended_action=action,
+                            category="comfort",
+                            timestamp=now_str,
+                        )
+                    )
+
+                # High energy consumption
+                if energy is not None and energy > 2.0:
+                    candidates.append(
+                        Insight(
+                            title=f"High energy usage in {zone_name}",
+                            explanation=(
+                                f"{zone_name} energy consumption ({energy:.1f} kWh) "
+                                f"is elevated. Consider reviewing HVAC schedule "
+                                f"for off-peak optimization."
+                            ),
+                            severity="info",
+                            affected_zones=[zone_id],
+                            recommended_action=(
+                                "Review HVAC and lighting schedules for "
+                                "potential off-peak savings."
+                            ),
+                            category="energy",
+                            timestamp=now_str,
+                        )
+                    )
+
+                # Low utilization
+                if occ is not None and occ < 3 and status != "unknown" and capacity > 0:
+                    util = (occ / capacity * 100) if capacity > 0 else 0
+                    candidates.append(
+                        Insight(
+                            title=f"Low utilization in {zone_name}",
+                            explanation=(
+                                f"{zone_name} has only {occ} occupants in a "
+                                f"{capacity}-person space ({util:.0f}% utilization). "
+                                f"Consider consolidating activities to reduce "
+                                f"energy waste."
+                            ),
+                            severity="info",
+                            affected_zones=[zone_id],
+                            recommended_action=(
+                                "Consolidate activities into fewer zones and "
+                                "reduce HVAC/lighting in unoccupied areas."
+                            ),
+                            category="occupancy",
+                            timestamp=now_str,
+                        )
+                    )
+
+                # High occupancy
+                if occ is not None and capacity > 0 and occ > capacity * 0.9:
+                    candidates.append(
+                        Insight(
+                            title=f"Near capacity in {zone_name}",
+                            explanation=(
+                                f"{zone_name} is near capacity ({occ}/{capacity}). "
+                                f"Consider redirecting overflow to alternative spaces."
+                            ),
+                            severity="warning",
+                            affected_zones=[zone_id],
+                            recommended_action=(
+                                "Redirect occupants to underutilized zones "
+                                "to maintain comfort and safety."
+                            ),
+                            category="occupancy",
+                            timestamp=now_str,
+                        )
+                    )
+
+    except Exception as exc:
+        logger.warning(f"Error generating mock insights: {exc}")
+
+    # Prioritize: critical > warning > info
+    severity_order = {"critical": 0, "warning": 1, "info": 2}
+    candidates.sort(key=lambda i: severity_order.get(i.severity, 3))
+
+    # Return max 5 insights, or a healthy-building message
+    if candidates:
+        return candidates[:5]
+
+    freedom = state_data.get("avg_freedom_index", 0)
+    energy = state_data.get("total_energy_kwh", 0)
+    occ = state_data.get("total_occupancy", 0)
+    return [
+        Insight(
+            title="Building operating normally",
+            explanation=(
+                f"All zones are within acceptable parameters. "
+                f"Building health index is {freedom:.0f}/100 with "
+                f"{occ} people and {energy:.1f} kWh total consumption."
+            ),
+            severity="info",
+            category="general",
+            timestamp=now_str,
+        )
+    ]
+
+
+def _mock_chat_response(
+    question: str,
+    state_data: dict | None,
+) -> str:
+    """Generate a data-aware chat response without the API.
+
+    Parses common question patterns and responds with building
+    metrics extracted from the current state data.
+
+    Args:
+        question: User's natural language question.
+        state_data: Current building state dict, or None.
+
+    Returns:
+        A contextual response string based on available data.
+    """
+    try:
+        q = question.lower()
+
+        # Collect zone-level data for analysis
+        zones: list[dict] = []
+        if state_data:
+            for floor in state_data.get("floors", []):
+                for z in floor.get("zones", []):
+                    zone_info = get_zone_by_id(z.get("zone_id", ""))
+                    z["_name"] = zone_info.name if zone_info else z.get("zone_id", "?")
+                    z["_capacity"] = zone_info.capacity if zone_info else 0
+                    zones.append(z)
+
+        total_occ = state_data.get("total_occupancy", 0) if state_data else 0
+        total_kwh = state_data.get("total_energy_kwh", 0) if state_data else 0
+        avg_freedom = state_data.get("avg_freedom_index", 0) if state_data else 0
+        n_alerts = state_data.get("active_alerts", 0) if state_data else 0
+
+        # Temperature questions
+        if any(kw in q for kw in ("temperature", "temp", "hot", "cold")):
+            temps = [
+                (z["_name"], z["temperature_c"])
+                for z in zones
+                if z.get("temperature_c") is not None
+            ]
+            if not temps:
+                return "No temperature data is currently available."
+            avg_temp = sum(t for _, t in temps) / len(temps)
+            out_of_range = [f"{n} ({t:.1f} C)" for n, t in temps if t > 24 or t < 20]
+            msg = f"The average building temperature is {avg_temp:.1f} C."
+            if out_of_range:
+                msg += (
+                    f" Zones outside the 20-24 C comfort range: "
+                    f"{', '.join(out_of_range)}."
+                )
+            else:
+                msg += " All zones are within the 20-24 C comfort range."
+            return msg
+
+        # Energy questions
+        if any(kw in q for kw in ("energy", "consumption", "kwh")):
+            energy_zones = [(z["_name"], z.get("total_energy_kwh", 0)) for z in zones]
+            energy_zones.sort(key=lambda x: x[1], reverse=True)
+            msg = f"Total building energy consumption is {total_kwh:.1f} kWh."
+            if energy_zones:
+                top = energy_zones[0]
+                msg += f" Highest consumer: {top[0]} at {top[1]:.1f} kWh."
+            return msg
+
+        # Occupancy questions
+        if any(kw in q for kw in ("occupancy", "people", "empty", "utilization")):
+            occ_zones = [
+                (z["_name"], z.get("occupant_count", 0), z["_capacity"])
+                for z in zones
+                if z["_capacity"] > 0
+            ]
+            occ_zones.sort(key=lambda x: x[1], reverse=True)
+            msg = f"Current total building occupancy is {total_occ} people."
+            if occ_zones:
+                busiest = occ_zones[0]
+                emptiest = occ_zones[-1]
+                msg += (
+                    f" Busiest zone: {busiest[0]} with {busiest[1]} occupants. "
+                    f"Emptiest zone: {emptiest[0]} with {emptiest[1]} occupants."
+                )
+            return msg
+
+        # CO2 / air quality questions
+        if any(kw in q for kw in ("co2", "air quality", "ventilation")):
+            co2_zones = [
+                (z["_name"], z["co2_ppm"])
+                for z in zones
+                if z.get("co2_ppm") is not None
+            ]
+            if not co2_zones:
+                return "No CO2 data is currently available."
+            co2_zones.sort(key=lambda x: x[1], reverse=True)
+            worst = co2_zones[0]
+            return (
+                f"The zone with highest CO2 is {worst[0]} at {worst[1]:.0f} ppm. "
+                f"{'This exceeds the 1000 ppm recommended threshold.' if worst[1] > 1000 else 'This is within acceptable levels.'}"
+            )
+
+        # Cost / savings questions
+        if any(kw in q for kw in ("cost", "money", "save", "expense", "budget")):
+            bleed = (
+                state_data.get("total_financial_bleed_eur_hr", 0) if state_data else 0
+            )
+            energy_zones = [(z["_name"], z.get("total_energy_kwh", 0)) for z in zones]
+            energy_zones.sort(key=lambda x: x[1], reverse=True)
+            msg = (
+                f"Current operating cost (financial bleed) is "
+                f"{bleed:.2f} EUR/hr with total energy at {total_kwh:.1f} kWh."
+            )
+            if energy_zones:
+                msg += (
+                    f" Top zone for potential savings: {energy_zones[0][0]} "
+                    f"consuming {energy_zones[0][1]:.1f} kWh."
+                )
+            return msg
+
+        # Alert / warning questions
+        if any(kw in q for kw in ("alert", "warning", "problem")):
+            problem_zones = [
+                f"{z['_name']} ({z.get('status', '?')})"
+                for z in zones
+                if z.get("status") in ("warning", "critical")
+            ]
+            if problem_zones:
+                return (
+                    f"There are {n_alerts} active alerts. "
+                    f"Affected zones: {', '.join(problem_zones)}."
+                )
+            return "No active alerts. All zones are operating within normal parameters."
+
+        # Health / score questions
+        if any(kw in q for kw in ("health", "score", "performance")):
+            return (
+                f"The average building health score is {avg_freedom:.0f}/100 "
+                f"with {total_occ} occupants and {n_alerts} active alerts. "
+                f"Total energy consumption is {total_kwh:.1f} kWh."
+            )
+
+        # Default fallback
+        n_zones = len(zones)
+        temps = [
+            z["temperature_c"] for z in zones if z.get("temperature_c") is not None
+        ]
+        avg_temp = sum(temps) / len(temps) if temps else 0
+        return (
+            f"Based on current sensor data, the building has {n_zones} active "
+            f"zones with {total_occ} total occupants. The average temperature "
+            f"is {avg_temp:.1f} C and total energy usage is {total_kwh:.1f} kWh. "
+            f"Ask about specific topics like temperature, energy, costs, or "
+            f"air quality for detailed analysis."
+        )
+
+    except Exception as exc:
+        logger.warning(f"Error in mock chat response: {exc}")
+        return (
+            "I'm processing your question using offline mode. "
+            "Please check the dashboard for current building data."
+        )
 
 
 # ── Private helpers ─────────────────────────────────

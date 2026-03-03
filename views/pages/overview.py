@@ -50,7 +50,7 @@ def create_overview_page() -> html.Div:
             html.Span("Poor"),
             html.Div(className="floorplan-legend-gradient"),
             html.Span("Excellent"),
-            html.Span("— Freedom Index", style={"marginLeft": "8px"}),
+            html.Span("— Building Health", style={"marginLeft": "8px"}),
         ],
         className="floorplan-legend",
     )

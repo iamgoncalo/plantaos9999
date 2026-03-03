@@ -25,6 +25,7 @@ def register_deployment_callbacks(app: object) -> None:
     """
     _register_config_update(app)
     _register_impact_preview(app)
+    _register_roi_calculator(app)
 
 
 def _register_config_update(app: object) -> None:
@@ -146,7 +147,7 @@ def _register_impact_preview(app: object) -> None:
                     html.Div(
                         [
                             html.Div(
-                                "Freedom Comparison",
+                                "Health Comparison",
                                 style={
                                     "fontSize": "14px",
                                     "fontWeight": 600,
@@ -156,18 +157,18 @@ def _register_impact_preview(app: object) -> None:
                             html.Div(
                                 [
                                     create_kpi_card(
-                                        title="Current Freedom",
+                                        title="Current Health",
                                         value=f"{current_freedom:.3f}",
                                         icon="mdi:shield-check-outline",
                                     ),
                                     create_kpi_card(
-                                        title="Modified Freedom",
+                                        title="Modified Health",
                                         value=f"{modified_freedom:.3f}",
                                         trend=freedom_trend,
                                         icon="mdi:shield-edit-outline",
                                     ),
                                     create_kpi_card(
-                                        title="\u0394Freedom",
+                                        title="\u0394Health",
                                         value=f"{delta_freedom:+.4f}",
                                         icon="mdi:delta",
                                     ),
@@ -185,7 +186,7 @@ def _register_impact_preview(app: object) -> None:
                     html.Div(
                         [
                             html.Div(
-                                "Financial Bleed Comparison",
+                                "Operating Cost Comparison",
                                 style={
                                     "fontSize": "14px",
                                     "fontWeight": 600,
@@ -195,20 +196,20 @@ def _register_impact_preview(app: object) -> None:
                             html.Div(
                                 [
                                     create_kpi_card(
-                                        title="Current Bleed",
+                                        title="Current Cost",
                                         value=f"\u20ac{current_bleed:.4f}",
                                         unit="/hr",
                                         icon="mdi:cash-minus",
                                     ),
                                     create_kpi_card(
-                                        title="Modified Bleed",
+                                        title="Modified Cost",
                                         value=f"\u20ac{modified_bleed:.4f}",
                                         unit="/hr",
                                         trend=bleed_trend,
                                         icon="mdi:cash-check",
                                     ),
                                     create_kpi_card(
-                                        title="\u0394Bleed",
+                                        title="\u0394Cost",
                                         value=f"\u20ac{delta_bleed:+.4f}",
                                         unit="/hr",
                                         icon="mdi:delta",
@@ -244,4 +245,112 @@ def _register_impact_preview(app: object) -> None:
                     "alignItems": "center",
                     "gap": "8px",
                 },
+            )
+
+
+def _register_roi_calculator(app: object) -> None:
+    """Register the ROI calculator callback.
+
+    Computes total hardware cost, estimated monthly savings, payback
+    period, and annual ROI from sensor deployment inputs.
+
+    Args:
+        app: The Dash application instance.
+    """
+
+    @app.callback(
+        Output("deploy-roi-summary", "children"),
+        Input("deploy-sensor-count", "value"),
+        Input("deploy-sensor-cost", "value"),
+        Input("deploy-install-cost", "value"),
+        Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
+    )
+    def update_roi(
+        sensor_count: int | None,
+        sensor_cost: float | None,
+        install_cost: float | None,
+        _n: int,
+        pathname: str | None,
+    ) -> html.Div:
+        """Compute and display ROI metrics.
+
+        Args:
+            sensor_count: Number of sensors to deploy.
+            sensor_cost: Cost per sensor in EUR.
+            install_cost: One-time installation cost in EUR.
+            _n: Interval tick (triggers refresh).
+            pathname: Current URL pathname.
+
+        Returns:
+            Dash html.Div with ROI KPI cards.
+        """
+        if pathname != "/deployment":
+            return no_update
+
+        try:
+            n_sensors = int(sensor_count or 16)
+            cost_each = float(sensor_cost or 150)
+            install = float(install_cost or 2000)
+
+            total_hardware = n_sensors * cost_each + install
+
+            # Estimate monthly savings from current building bleed
+            try:
+                afi = compute_building_afi()
+                current_bleed = afi.total_financial_bleed_eur_hr
+            except Exception:
+                current_bleed = 3.0  # fallback estimate
+
+            # Assume sensors reduce bleed by 30-50% depending on count
+            reduction_pct = min(0.5, 0.02 * n_sensors)
+            monthly_savings = current_bleed * reduction_pct * 720
+
+            # Payback and ROI
+            if monthly_savings > 0:
+                payback_months = total_hardware / monthly_savings
+                annual_roi = (
+                    (monthly_savings * 12 - total_hardware) / total_hardware
+                ) * 100
+            else:
+                payback_months = float("inf")
+                annual_roi = 0.0
+
+            payback_str = f"{payback_months:.0f}" if payback_months < 100 else "N/A"
+
+            return html.Div(
+                [
+                    create_kpi_card(
+                        title="Hardware Investment",
+                        value=f"€{total_hardware:,.0f}",
+                        icon="mdi:chip",
+                    ),
+                    create_kpi_card(
+                        title="Monthly Savings",
+                        value=f"€{monthly_savings:.0f}",
+                        icon="mdi:piggy-bank-outline",
+                    ),
+                    create_kpi_card(
+                        title="Payback Period",
+                        value=payback_str,
+                        unit="months",
+                        icon="mdi:calendar-clock",
+                    ),
+                    create_kpi_card(
+                        title="Annual ROI",
+                        value=f"{annual_roi:+.0f}%",
+                        icon="mdi:trending-up",
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "gap": "12px",
+                    "flexWrap": "wrap",
+                },
+            )
+        except Exception as exc:
+            logger.warning(f"ROI calculator error: {exc}")
+            return html.Span(
+                "Error calculating ROI.",
+                style={"color": "#FF3B30", "fontSize": "13px"},
             )

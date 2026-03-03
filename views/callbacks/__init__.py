@@ -11,6 +11,7 @@ from dash import Input, Output, State, html, no_update
 from dash_iconify import DashIconify
 from loguru import logger
 
+from views.callbacks.admin_cb import register_admin_callbacks
 from views.callbacks.booking_cb import register_booking_callbacks
 from views.callbacks.building_3d_cb import register_3d_callbacks
 from views.callbacks.comfort_cb import register_comfort_callbacks
@@ -38,6 +39,7 @@ _PAGE_TITLES: dict[str, str] = {
     "/reports": "Reports",
     "/deployment": "Deployment",
     "/booking": "Smart Booking",
+    "/admin": "Settings",
 }
 
 
@@ -57,6 +59,7 @@ def register_callbacks(app: object) -> None:
     _register_alert_feed_callback(app)
     _register_clientside_header_status(app)
     _register_clientside_sidebar_toggle(app)
+    _register_tenant_sync(app)
     # Detail page callbacks
     register_energy_callbacks(app)
     register_comfort_callbacks(app)
@@ -69,6 +72,7 @@ def register_callbacks(app: object) -> None:
     register_deployment_callbacks(app)
     register_view_2d_callbacks(app)
     register_booking_callbacks(app)
+    register_admin_callbacks(app)
 
 
 def _register_routing_callback(app: object) -> None:
@@ -82,6 +86,7 @@ def _register_routing_callback(app: object) -> None:
     def route_page(pathname: str) -> tuple:
         """Route URL pathname to the correct page component."""
         try:
+            from views.pages.admin import create_admin_page
             from views.pages.booking import create_booking_page
             from views.pages.building_3d import create_building_3d_page
             from views.pages.comfort import create_comfort_page
@@ -108,6 +113,7 @@ def _register_routing_callback(app: object) -> None:
                 "/reports": create_reports_page,
                 "/deployment": create_deployment_page,
                 "/booking": create_booking_page,
+                "/admin": create_admin_page,
             }
 
             title = _PAGE_TITLES.get(pathname, "Not Found")
@@ -220,10 +226,10 @@ def _register_overview_kpi_callback(app: object) -> None:
 
         _empty = [
             create_kpi_card("Total Energy", "—", icon="mdi:flash"),
-            create_kpi_card("Financial Bleed", "—", icon="mdi:currency-eur"),
+            create_kpi_card("Operating Cost", "—", icon="mdi:currency-eur"),
             create_kpi_card("Occupancy", "—", icon="mdi:account-group"),
             create_kpi_card("Active Alerts", "—", icon="mdi:alert-circle-outline"),
-            create_kpi_card("AFI Freedom", "—", icon="mdi:shield-check-outline"),
+            create_kpi_card("Building Health", "—", icon="mdi:shield-check-outline"),
         ]
 
         if not state_data:
@@ -248,7 +254,7 @@ def _register_overview_kpi_callback(app: object) -> None:
                     icon="mdi:flash",
                 ),
                 create_kpi_card(
-                    "Financial Bleed",
+                    "Operating Cost",
                     f"{total_bleed:.2f}" if total_bleed < 100 else f"{total_bleed:.0f}",
                     unit="€/hr",
                     icon="mdi:currency-eur",
@@ -265,7 +271,7 @@ def _register_overview_kpi_callback(app: object) -> None:
                     icon="mdi:alert-circle-outline",
                 ),
                 create_kpi_card(
-                    "AFI Freedom",
+                    "Building Health",
                     f"{afi_freedom:.0f}",
                     unit="/100",
                     icon="mdi:shield-check-outline",
@@ -475,6 +481,15 @@ def _register_clientside_sidebar_toggle(app: object) -> None:
         Output("sidebar-open-store", "data"),
         Input("sidebar-toggle-btn", "n_clicks"),
         Input("sidebar-overlay", "n_clicks"),
+    )
+
+
+def _register_tenant_sync(app: object) -> None:
+    """Sync tenant dropdown selection to the tenant store."""
+    app.clientside_callback(
+        "function(val) { return val; }",
+        Output("tenant-store", "data"),
+        Input("tenant-selector", "value"),
     )
 
 

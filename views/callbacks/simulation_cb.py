@@ -235,9 +235,9 @@ def _register_timeline(app: object) -> None:
 
 
 def _register_damage_summary(app: object) -> None:
-    """Register the callback that renders the damage summary KPI cards.
+    """Register the callback that renders the savings/impact KPI cards.
 
-    Shows four cards: Total Damage, Evacuation Time, Peak Distortion,
+    Shows four cards: Monthly Savings, Implementation, Comfort Impact,
     and Zones Affected.
 
     Args:
@@ -254,7 +254,7 @@ def _register_damage_summary(app: object) -> None:
         result_data: dict | None,
         pathname: str | None,
     ) -> html.Div:
-        """Build damage summary KPI cards from simulation result.
+        """Build savings summary KPI cards from simulation result.
 
         Args:
             result_data: Serialized SimulationResult dict from the store.
@@ -271,36 +271,69 @@ def _register_damage_summary(app: object) -> None:
             evac_time = result_data.get("evacuation_time_seconds")
             zones_affected = result_data.get("zones_affected", [])
             timeline = result_data.get("timeline", [])
+            event_type = result_data.get("event_type", "")
 
-            # Peak distortion from timeline steps
-            peak_distortion = 1.0
+            # Peak impact from timeline steps
+            peak_impact = 1.0
             if timeline:
-                peak_distortion = max(
+                peak_impact = max(
                     (step.get("distortion", 1.0) for step in timeline),
                     default=1.0,
                 )
 
-            # Format evacuation time
-            evac_str = f"{evac_time:.0f}" if evac_time is not None else "N/A"
-            evac_unit = "s" if evac_time is not None else ""
+            # For optimization modes, reframe as savings potential
+            is_emergency = event_type == "fire"
+            if is_emergency:
+                # Emergency scenario: show damage and evacuation
+                evac_str = f"{evac_time:.0f}" if evac_time is not None else "N/A"
+                return html.Div(
+                    [
+                        create_kpi_card(
+                            title="Potential Damage",
+                            value=f"€{total_damage:.0f}",
+                            icon="mdi:alert-circle",
+                        ),
+                        create_kpi_card(
+                            title="Evacuation Time",
+                            value=evac_str,
+                            unit="s" if evac_time else "",
+                            icon="mdi:run-fast",
+                        ),
+                        create_kpi_card(
+                            title="Peak Impact",
+                            value=f"{peak_impact:.1f}",
+                            icon="mdi:chart-bell-curve-cumulative",
+                        ),
+                        create_kpi_card(
+                            title="Zones Affected",
+                            value=str(len(zones_affected)),
+                            icon="mdi:map-marker-alert-outline",
+                        ),
+                    ],
+                    className="grid-4",
+                )
+
+            # Optimization mode: reframe as savings
+            monthly_savings = total_damage * 30
+            comfort_delta = min(peak_impact * 2, 5.0)
 
             return html.Div(
                 [
                     create_kpi_card(
-                        title="Total Damage",
-                        value=f"€{total_damage:.0f}",
-                        icon="mdi:currency-eur",
+                        title="Monthly Savings",
+                        value=f"€{monthly_savings:.0f}",
+                        icon="mdi:piggy-bank-outline",
                     ),
                     create_kpi_card(
-                        title="Evacuation Time",
-                        value=evac_str,
-                        unit=evac_unit,
-                        icon="mdi:run-fast",
+                        title="Implementation",
+                        value="7-14",
+                        unit="days",
+                        icon="mdi:clock-outline",
                     ),
                     create_kpi_card(
-                        title="Peak Distortion",
-                        value=f"{peak_distortion:.1f}",
-                        icon="mdi:chart-bell-curve-cumulative",
+                        title="Comfort Impact",
+                        value=f"{comfort_delta:+.1f}°C",
+                        icon="mdi:thermometer-check",
                     ),
                     create_kpi_card(
                         title="Zones Affected",
@@ -311,7 +344,7 @@ def _register_damage_summary(app: object) -> None:
                 className="grid-4",
             )
         except Exception as exc:
-            logger.error(f"Damage summary render error: {exc}")
+            logger.error(f"Savings summary render error: {exc}")
             return _empty_damage_summary()
 
 
@@ -434,7 +467,7 @@ def _register_affected_zones(app: object) -> None:
 
 
 def _empty_damage_summary() -> html.Div:
-    """Return placeholder KPI cards for the damage summary.
+    """Return placeholder KPI cards for the savings summary.
 
     Returns:
         Dash html.Div with placeholder KPI cards showing '--' values.
@@ -442,21 +475,21 @@ def _empty_damage_summary() -> html.Div:
     return html.Div(
         [
             create_kpi_card(
-                title="Total Damage",
+                title="Monthly Savings",
                 value="--",
                 unit="€",
-                icon="mdi:currency-eur",
+                icon="mdi:piggy-bank-outline",
             ),
             create_kpi_card(
-                title="Evacuation Time",
+                title="Implementation",
                 value="--",
-                unit="s",
-                icon="mdi:run-fast",
+                unit="days",
+                icon="mdi:clock-outline",
             ),
             create_kpi_card(
-                title="Peak Distortion",
+                title="Comfort Impact",
                 value="--",
-                icon="mdi:chart-bell-curve-cumulative",
+                icon="mdi:thermometer-check",
             ),
             create_kpi_card(
                 title="Zones Affected",

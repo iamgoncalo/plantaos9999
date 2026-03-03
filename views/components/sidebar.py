@@ -40,7 +40,8 @@ NAV_ITEMS: list[dict] = [
     {"id": "simulation", "label": "Simulation", "icon": "mdi:play-circle-outline"},
     {"id": "insights", "label": "Insights", "icon": "mdi:lightbulb-on"},
     {"id": "reports", "label": "Reports", "icon": "mdi:file-chart-outline"},
-    {"id": "deployment", "label": "Deployment", "icon": "mdi:cog-outline"},
+    {"id": "deployment", "label": "Deployment", "icon": "mdi:rocket-launch-outline"},
+    {"id": "admin", "label": "Settings", "icon": "mdi:cog-outline"},
 ]
 
 
@@ -90,7 +91,7 @@ def create_sidebar(active_page: str = "overview") -> html.Div:
     brand = html.Div(
         [
             html.Div("PlantaOS", className="sidebar-brand"),
-            html.Div("Digital Twin · AFI", className="sidebar-brand-subtitle"),
+            html.Div("Digital Twin", className="sidebar-brand-subtitle"),
         ],
         style={"marginBottom": f"{SPACING_SM}px"},
     )
@@ -162,7 +163,7 @@ def create_sidebar(active_page: str = "overview") -> html.Div:
                 [
                     html.Span(className="status-dot healthy"),
                     html.Span(
-                        "AFI Freedom",
+                        "Building Health",
                         style={
                             "fontSize": FONT_SIZE_XS,
                             "fontWeight": WEIGHT_SEMIBOLD,

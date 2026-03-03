@@ -1,7 +1,7 @@
 """Plotly SVG floorplan renderer with zone overlays.
 
 Generates an interactive 2D floorplan using Plotly shapes and
-scatter traces, with zones colored by their Freedom Index or
+scatter traces, with zones colored by their Building Health or
 selected comfort metric.
 """
 
@@ -277,12 +277,12 @@ def _create_hover_trace(
             lines.append(f"CO2: {co2:.0f} ppm")
         lines.append(f"Occupancy: {occ}/{cap}")
         lines.append(f"Energy: {energy:.2f} kWh")
-        lines.append(f"Freedom Index: {freedom:.0f}/100")
+        lines.append(f"Building Health: {freedom:.0f}/100")
         bleed_val = zone_data.get("financial_bleed", 0) or zone_data.get(
             "financial_bleed_eur_hr", 0
         )
         if bleed_val:
-            lines.append(f"Financial Bleed: €{bleed_val:.2f}/hr")
+            lines.append(f"Operating Cost: €{bleed_val:.2f}/hr")
         hover_text = "<br>".join(lines)
     else:
         hover_text = f"<b>{name}</b><br>No data available"
@@ -391,7 +391,7 @@ def _create_color_legend() -> go.Scatter:
             cmin=0,
             cmax=100,
             colorbar=dict(
-                title=dict(text="Freedom Index", font=dict(size=11)),
+                title=dict(text="Building Health", font=dict(size=11)),
                 thickness=12,
                 len=0.5,
                 x=1.02,

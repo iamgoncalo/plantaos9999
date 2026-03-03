@@ -1,8 +1,8 @@
-"""What-if simulation page: scenario testing and impact analysis.
+"""Optimization scenarios page: cost-saving analysis and what-if testing.
 
-Allows users to trigger catastrophic and operational scenarios (fire,
-open window, mass entry, HVAC failure) on any building zone and
-visualize the projected cascade effects, timeline, and financial damage.
+Allows users to explore cost-saving opportunities across building zones,
+run optimization scenarios, and test emergency preparedness. Reframes
+the simulation engine output as savings potential rather than damage.
 """
 
 from __future__ import annotations
@@ -30,11 +30,11 @@ from views.components.kpi_card import create_kpi_card
 
 
 def create_simulation_page() -> html.Div:
-    """Create the what-if simulation page layout.
+    """Create the optimization scenarios page layout.
 
     Returns:
-        Dash html.Div containing the simulation page with event
-        trigger panel, timeline chart, and damage summary.
+        Dash html.Div containing the cost optimizer with scenario
+        configuration, savings projections, and recommendations.
     """
     # ── Header ─────────────────────────────────
     page_header = html.Div(
@@ -42,12 +42,12 @@ def create_simulation_page() -> html.Div:
             html.Div(
                 [
                     DashIconify(
-                        icon="mdi:play-circle-outline",
+                        icon="mdi:chart-line",
                         width=28,
                         color=ACCENT_BLUE,
                     ),
                     html.H2(
-                        "What-If Simulation",
+                        "Optimization Scenarios",
                         style={
                             "margin": 0,
                             "fontSize": "22px",
@@ -63,8 +63,8 @@ def create_simulation_page() -> html.Div:
                 },
             ),
             html.P(
-                "Test catastrophic and operational scenarios to predict "
-                "cascade effects, evacuation times, and financial impact.",
+                "Discover cost-saving opportunities and test operational "
+                "scenarios across your building.",
                 style={
                     "margin": "8px 0 0",
                     "color": TEXT_SECONDARY,
@@ -79,7 +79,7 @@ def create_simulation_page() -> html.Div:
     # ── Hidden store for simulation results ────
     result_store = dcc.Store(id="sim-result-store", storage_type="memory")
 
-    # ── Left panel: Event trigger ──────────────
+    # ── Left panel: Scenario Configuration ─────
     zone_options = [{"label": z.name, "value": z.id} for z in get_monitored_zones()]
 
     event_trigger_panel = html.Div(
@@ -93,11 +93,11 @@ def create_simulation_page() -> html.Div:
                     "marginBottom": "16px",
                 },
             ),
-            # Event type selector
+            # Optimization mode selector
             html.Div(
                 [
                     html.Label(
-                        "Event Type",
+                        "Optimization Mode",
                         style={
                             "fontSize": "13px",
                             "fontWeight": 500,
@@ -113,11 +113,11 @@ def create_simulation_page() -> html.Div:
                                 "label": html.Span(
                                     [
                                         DashIconify(
-                                            icon="mdi:fire",
+                                            icon="mdi:air-conditioner",
                                             width=16,
-                                            color=STATUS_CRITICAL,
+                                            color=ACCENT_BLUE,
                                         ),
-                                        " Fire",
+                                        " HVAC Optimization",
                                     ],
                                     style={
                                         "display": "inline-flex",
@@ -125,7 +125,7 @@ def create_simulation_page() -> html.Div:
                                         "gap": "4px",
                                     },
                                 ),
-                                "value": "fire",
+                                "value": "hvac_failure",
                             },
                             {
                                 "label": html.Span(
@@ -135,7 +135,7 @@ def create_simulation_page() -> html.Div:
                                             width=16,
                                             color=STATUS_WARNING,
                                         ),
-                                        " Open Window",
+                                        " Window Management",
                                     ],
                                     style={
                                         "display": "inline-flex",
@@ -153,7 +153,7 @@ def create_simulation_page() -> html.Div:
                                             width=16,
                                             color=ACCENT_BLUE,
                                         ),
-                                        " Mass Entry",
+                                        " Occupancy Planning",
                                     ],
                                     style={
                                         "display": "inline-flex",
@@ -167,11 +167,11 @@ def create_simulation_page() -> html.Div:
                                 "label": html.Span(
                                     [
                                         DashIconify(
-                                            icon="mdi:air-conditioner",
+                                            icon="mdi:fire",
                                             width=16,
-                                            color=TEXT_TERTIARY,
+                                            color=STATUS_CRITICAL,
                                         ),
-                                        " HVAC Failure",
+                                        " Emergency Readiness",
                                     ],
                                     style={
                                         "display": "inline-flex",
@@ -179,10 +179,10 @@ def create_simulation_page() -> html.Div:
                                         "gap": "4px",
                                     },
                                 ),
-                                "value": "hvac_failure",
+                                "value": "fire",
                             },
                         ],
-                        value="fire",
+                        value="hvac_failure",
                         className="sim-radio-group",
                         style={
                             "display": "flex",
@@ -217,11 +217,11 @@ def create_simulation_page() -> html.Div:
                 ],
                 style={"marginBottom": "20px"},
             ),
-            # Intensity slider
+            # Optimization level slider
             html.Div(
                 [
                     html.Label(
-                        "Intensity",
+                        "Optimization Level",
                         style={
                             "fontSize": "13px",
                             "fontWeight": 500,
@@ -237,9 +237,9 @@ def create_simulation_page() -> html.Div:
                         step=0.1,
                         value=0.8,
                         marks={
-                            0.1: {"label": "Low"},
-                            0.5: {"label": "Medium"},
-                            1.0: {"label": "High"},
+                            0.1: {"label": "Conservative"},
+                            0.5: {"label": "Moderate"},
+                            1.0: {"label": "Aggressive"},
                         },
                         tooltip={
                             "placement": "bottom",
@@ -253,11 +253,11 @@ def create_simulation_page() -> html.Div:
             html.Button(
                 [
                     DashIconify(
-                        icon="mdi:play",
+                        icon="mdi:calculator-variant",
                         width=18,
                         color="#FFFFFF",
                     ),
-                    " Run Simulation",
+                    " Calculate Savings",
                 ],
                 id="sim-trigger-btn",
                 n_clicks=0,
@@ -294,15 +294,15 @@ def create_simulation_page() -> html.Div:
     # ── Right panel: Results ───────────────────
     results_panel = html.Div(
         [
-            # Damage summary KPIs
+            # Savings summary KPIs
             html.Div(
                 id="sim-damage-summary",
                 children=_empty_damage_summary(),
                 style={"marginBottom": f"{GAP_ELEMENT}px"},
             ),
             # Timeline chart
-            chart_card("sim-timeline-chart", "Simulation Timeline"),
-            # Affected zones list
+            chart_card("sim-timeline-chart", "Projected Impact Timeline"),
+            # Recommendations
             html.Div(
                 id="sim-affected-zones",
                 children=_empty_affected_zones(),
@@ -354,7 +354,7 @@ def left_col(children: html.Div) -> html.Div:
 
 
 def _empty_damage_summary() -> html.Div:
-    """Return placeholder KPI cards for the damage summary.
+    """Return placeholder KPI cards for the savings summary.
 
     Returns:
         Dash html.Div with placeholder KPI cards.
@@ -362,21 +362,21 @@ def _empty_damage_summary() -> html.Div:
     return html.Div(
         [
             create_kpi_card(
-                title="Total Damage",
+                title="Monthly Savings",
                 value="--",
                 unit="\u20ac",
-                icon="mdi:currency-eur",
+                icon="mdi:piggy-bank-outline",
             ),
             create_kpi_card(
-                title="Evacuation Time",
+                title="Implementation",
                 value="--",
-                unit="s",
-                icon="mdi:run-fast",
+                unit="days",
+                icon="mdi:clock-outline",
             ),
             create_kpi_card(
-                title="Peak Distortion",
+                title="Comfort Impact",
                 value="--",
-                icon="mdi:chart-bell-curve-cumulative",
+                icon="mdi:thermometer-check",
             ),
             create_kpi_card(
                 title="Zones Affected",
@@ -389,7 +389,7 @@ def _empty_damage_summary() -> html.Div:
 
 
 def _empty_affected_zones() -> html.Div:
-    """Return placeholder for the affected zones section.
+    """Return placeholder for the recommendations section.
 
     Returns:
         Dash html.Div with empty state message.
@@ -398,12 +398,13 @@ def _empty_affected_zones() -> html.Div:
         html.Div(
             [
                 DashIconify(
-                    icon="mdi:information-outline",
+                    icon="mdi:lightbulb-outline",
                     width=20,
                     color=TEXT_TERTIARY,
                 ),
                 html.Span(
-                    "Run a simulation to see affected zones and cascade effects.",
+                    "Run a scenario to see optimization recommendations "
+                    "and projected savings.",
                     style={
                         "color": TEXT_TERTIARY,
                         "fontSize": "13px",

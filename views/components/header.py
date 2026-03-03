@@ -63,22 +63,33 @@ def create_header(
         className="global-search-bar",
     )
 
-    # Tenant badge
-    tenant_badge = html.Span(
+    # Tenant selector dropdown
+    tenant_selector = html.Div(
         [
             DashIconify(
                 icon="mdi:domain",
                 width=14,
                 color=ACCENT_BLUE,
+                style={"flexShrink": 0},
             ),
-            html.Span("HORSE Renault"),
+            dcc.Dropdown(
+                id="tenant-selector",
+                options=[
+                    {"label": "HORSE Renault", "value": "horse_renault"},
+                    {"label": "Airbus Assembly", "value": "airbus_assembly"},
+                    {"label": "IKEA Logistics", "value": "ikea_logistics"},
+                ],
+                value="horse_renault",
+                clearable=False,
+                className="tenant-dropdown",
+            ),
         ],
         className="tenant-badge",
     )
 
     right = html.Div(
         [
-            tenant_badge,
+            tenant_selector,
             html.Span(
                 id="header-clock",
                 children="--:--",

@@ -98,13 +98,13 @@ def create_reports_page() -> html.Div:
                         icon="mdi:flash",
                     ),
                     create_kpi_card(
-                        title="Human Capital Loss",
+                        title="Productivity Impact",
                         value="—",
                         unit="€",
                         icon="mdi:account-group",
                     ),
                     create_kpi_card(
-                        title="Window Penalties",
+                        title="HVAC Waste",
                         value="—",
                         unit="€",
                         icon="mdi:window-open-variant",

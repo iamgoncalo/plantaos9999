@@ -438,7 +438,7 @@ def generate_3d_html(
           + '<span class="tt-value">' + m.total_energy_kwh.toFixed(2) + ' kWh</span></div>';
       if (m.freedom_index != null) {{
         html += '<div class="tt-divider"></div>';
-        html += '<div class="tt-row"><span class="tt-label">Freedom Index</span>'
+        html += '<div class="tt-row"><span class="tt-label">Building Health</span>'
           + '<span class="tt-value" style="font-weight:600">'
           + m.freedom_index.toFixed(0) + '/100</span></div>';
       }}

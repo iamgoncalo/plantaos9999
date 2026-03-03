@@ -62,10 +62,10 @@ def _register_reports_kpis(app: object) -> None:
         empty = [
             create_kpi_card("Total Energy Cost", "—", unit="€", icon="mdi:flash"),
             create_kpi_card(
-                "Human Capital Loss", "—", unit="€", icon="mdi:account-group"
+                "Productivity Impact", "—", unit="€", icon="mdi:account-group"
             ),
             create_kpi_card(
-                "Window Penalties", "—", unit="€", icon="mdi:window-open-variant"
+                "HVAC Waste", "—", unit="€", icon="mdi:window-open-variant"
             ),
             create_kpi_card(
                 "Net Savings", "—", unit="€", icon="mdi:piggy-bank-outline"
@@ -104,13 +104,13 @@ def _register_reports_kpis(app: object) -> None:
                     icon="mdi:flash",
                 ),
                 create_kpi_card(
-                    "Human Capital Loss",
+                    "Productivity Impact",
                     f"{total_human:.0f}" if total_human >= 1 else f"{total_human:.2f}",
                     unit="€",
                     icon="mdi:account-group",
                 ),
                 create_kpi_card(
-                    "Window Penalties",
+                    "HVAC Waste",
                     f"{total_window:.0f}"
                     if total_window >= 1
                     else f"{total_window:.2f}",
@@ -135,7 +135,7 @@ def _register_reports_kpis(app: object) -> None:
 
 
 def _register_breakdown_pie(app: object) -> None:
-    """Pie chart: Energy vs Human Capital vs Window Penalties."""
+    """Pie chart: Energy vs Productivity Impact vs HVAC Waste."""
 
     @app.callback(
         Output("reports-chart-breakdown", "figure"),
@@ -162,7 +162,7 @@ def _register_breakdown_pie(app: object) -> None:
                 total_human += bleed.human_capital_loss_eur_hr * hours
                 total_window += bleed.open_window_penalty_eur_hr * hours
 
-            labels = ["Energy Cost", "Human Capital Loss", "Window Penalties"]
+            labels = ["Energy Cost", "Productivity Impact", "HVAC Waste"]
             values = [total_energy, total_human, total_window]
 
             if sum(values) == 0:

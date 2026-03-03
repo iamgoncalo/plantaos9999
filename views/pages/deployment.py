@@ -129,8 +129,8 @@ def create_deployment_page() -> html.Div:
                         },
                     ),
                     html.P(
-                        "Tune AFI parameters and manage sensor deployment "
-                        "across building zones.",
+                        "Plan your sensor deployment, tune building parameters, "
+                        "and calculate ROI.",
                         style={
                             "margin": "6px 0 0",
                             "color": TEXT_SECONDARY,
@@ -150,7 +150,7 @@ def create_deployment_page() -> html.Div:
                     html.Div(
                         [
                             html.H3(
-                                "Formula Tuning",
+                                "Building Parameters",
                                 style={
                                     "fontSize": "16px",
                                     "fontWeight": 600,
@@ -178,7 +178,7 @@ def create_deployment_page() -> html.Div:
                                 unit="\u20ac/hr",
                             ),
                             _slider_row(
-                                "Temperature Weight",
+                                "Temperature Sensitivity",
                                 "deploy-w-temp",
                                 0.0,
                                 1.0,
@@ -186,7 +186,7 @@ def create_deployment_page() -> html.Div:
                                 cfg.w_temperature,
                             ),
                             _slider_row(
-                                "CO2 Weight",
+                                "Air Quality Sensitivity",
                                 "deploy-w-co2",
                                 0.0,
                                 1.0,
@@ -194,7 +194,7 @@ def create_deployment_page() -> html.Div:
                                 cfg.w_co2,
                             ),
                             _slider_row(
-                                "Crowding Weight",
+                                "Crowding Sensitivity",
                                 "deploy-w-crowd",
                                 0.0,
                                 1.0,
@@ -202,7 +202,7 @@ def create_deployment_page() -> html.Div:
                                 cfg.w_crowding,
                             ),
                             _slider_row(
-                                "Blocked Exit Weight",
+                                "Exit Access Sensitivity",
                                 "deploy-w-exit",
                                 0.0,
                                 1.0,
@@ -236,7 +236,7 @@ def create_deployment_page() -> html.Div:
                             # Before/after comparison container
                             html.Div(
                                 "Adjust parameters to preview the impact on "
-                                "Freedom and financial bleed.",
+                                "building health and operating cost.",
                                 id="deploy-impact-preview",
                                 style={
                                     "fontSize": "13px",
@@ -287,6 +287,138 @@ def create_deployment_page() -> html.Div:
                     "gap": f"{GAP_ELEMENT}px",
                     "alignItems": "flex-start",
                     "flexWrap": "wrap",
+                },
+            ),
+            # ── ROI Calculator Section ────────────
+            html.Div(
+                [
+                    html.H3(
+                        "ROI Calculator",
+                        style={
+                            "fontSize": "16px",
+                            "fontWeight": 600,
+                            "color": TEXT_PRIMARY,
+                            "marginBottom": "16px",
+                            "marginTop": 0,
+                        },
+                    ),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Number of Sensors",
+                                        style={
+                                            "fontSize": "13px",
+                                            "fontWeight": 500,
+                                            "color": TEXT_SECONDARY,
+                                            "marginBottom": "4px",
+                                            "display": "block",
+                                        },
+                                    ),
+                                    dcc.Input(
+                                        id="deploy-sensor-count",
+                                        type="number",
+                                        value=16,
+                                        min=1,
+                                        max=100,
+                                        style={
+                                            "width": "100%",
+                                            "padding": "8px 12px",
+                                            "borderRadius": "8px",
+                                            "border": "1px solid #E5E5EA",
+                                            "fontSize": "14px",
+                                            "fontFamily": "JetBrains Mono",
+                                        },
+                                    ),
+                                ],
+                                style={"flex": 1, "minWidth": "140px"},
+                            ),
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Cost per Sensor (€)",
+                                        style={
+                                            "fontSize": "13px",
+                                            "fontWeight": 500,
+                                            "color": TEXT_SECONDARY,
+                                            "marginBottom": "4px",
+                                            "display": "block",
+                                        },
+                                    ),
+                                    dcc.Input(
+                                        id="deploy-sensor-cost",
+                                        type="number",
+                                        value=150,
+                                        min=10,
+                                        max=2000,
+                                        style={
+                                            "width": "100%",
+                                            "padding": "8px 12px",
+                                            "borderRadius": "8px",
+                                            "border": "1px solid #E5E5EA",
+                                            "fontSize": "14px",
+                                            "fontFamily": "JetBrains Mono",
+                                        },
+                                    ),
+                                ],
+                                style={"flex": 1, "minWidth": "140px"},
+                            ),
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Installation Cost (€)",
+                                        style={
+                                            "fontSize": "13px",
+                                            "fontWeight": 500,
+                                            "color": TEXT_SECONDARY,
+                                            "marginBottom": "4px",
+                                            "display": "block",
+                                        },
+                                    ),
+                                    dcc.Input(
+                                        id="deploy-install-cost",
+                                        type="number",
+                                        value=2000,
+                                        min=0,
+                                        max=50000,
+                                        style={
+                                            "width": "100%",
+                                            "padding": "8px 12px",
+                                            "borderRadius": "8px",
+                                            "border": "1px solid #E5E5EA",
+                                            "fontSize": "14px",
+                                            "fontFamily": "JetBrains Mono",
+                                        },
+                                    ),
+                                ],
+                                style={"flex": 1, "minWidth": "140px"},
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "gap": "16px",
+                            "marginBottom": "20px",
+                            "flexWrap": "wrap",
+                        },
+                    ),
+                    html.Div(
+                        id="deploy-roi-summary",
+                        children=html.Span(
+                            "Enter values above to calculate ROI.",
+                            style={
+                                "color": TEXT_TERTIARY,
+                                "fontSize": "13px",
+                            },
+                        ),
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
                 },
             ),
         ],

@@ -30,6 +30,14 @@ from data.store import store
 
 
 # ═══════════════════════════════════════════════
+# Realistic Financial Caps
+# ═══════════════════════════════════════════════
+# ~800m² building, €3000/month ÷ 720hrs ≈ €4.17/hr
+MAX_BUILDING_BLEED_EUR_HR = 8.0  # generous cap with margin
+MAX_ZONE_BLEED_EUR_HR = 3.0  # no single zone exceeds this
+
+
+# ═══════════════════════════════════════════════
 # Pydantic Result Models
 # ═══════════════════════════════════════════════
 
@@ -493,7 +501,7 @@ def compute_financial_bleed(
     # ── 3. Human Capital Loss (€/hr) ──────────────
     human_loss = _compute_human_capital_loss(zone_id, cfg)
 
-    total = energy_cost + window_penalty + human_loss
+    total = min(energy_cost + window_penalty + human_loss, MAX_ZONE_BLEED_EUR_HR)
 
     return FinancialBleed(
         zone_id=zone_id,
@@ -680,7 +688,9 @@ def compute_building_afi(
     return BuildingAFI(
         zones=zones_afi,
         stigmergy=stigmergy,
-        total_financial_bleed_eur_hr=round(total_bleed, 4),
+        total_financial_bleed_eur_hr=round(
+            min(total_bleed, MAX_BUILDING_BLEED_EUR_HR), 4
+        ),
         avg_freedom=round(avg_freedom, 4),
         total_risk_eur=round(total_risk, 2),
     )

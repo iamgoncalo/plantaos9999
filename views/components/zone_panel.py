@@ -210,7 +210,7 @@ def create_zone_detail(
         style={"marginBottom": "16px"},
     )
 
-    # Freedom Index score
+    # Building Health score
     freedom = zone_state.get("freedom_index", 0)
     freedom_color = zone_health_to_color(freedom)
     from utils.colors import hex_to_rgb
@@ -227,7 +227,7 @@ def create_zone_detail(
             ),
             html.Div(
                 [
-                    html.Div("Freedom Index", className="zone-freedom-label"),
+                    html.Div("Building Health", className="zone-freedom-label"),
                     html.Div(
                         html.Div(
                             className="freedom-bar-fill",

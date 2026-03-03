@@ -33,7 +33,7 @@ _PAGE_TITLES: dict[str, str] = {
     "/energy": "Energy",
     "/comfort": "Comfort",
     "/occupancy": "Occupancy",
-    "/insights": "Insights",
+    "/insights": "System Intelligence",
     "/building_3d": "3D Building",
     "/view_2d": "2D Map",
     "/view_4d": "4D Simulation",
@@ -62,6 +62,7 @@ def register_callbacks(app: object) -> None:
     _register_clientside_header_status(app)
     _register_clientside_sidebar_toggle(app)
     _register_tenant_sync(app)
+    _register_search_callback(app)
     # Detail page callbacks
     register_energy_callbacks(app)
     register_comfort_callbacks(app)
@@ -173,10 +174,31 @@ def _register_routing_callback(app: object) -> None:
 
 
 def _register_clientside_clock(app: object) -> None:
-    """Clientside callback for header clock + shift indicator."""
+    """Clientside callback for header clock + shift indicator.
+
+    Sets up a JS setInterval(1000) on first trigger so the clock
+    ticks every second independently of the 5s data-refresh-interval.
+    """
     app.clientside_callback(
         """
         function(n) {
+            if (!window._plantaClockInterval) {
+                window._plantaClockInterval = setInterval(function() {
+                    var now = new Date();
+                    var h = String(now.getHours()).padStart(2, '0');
+                    var m = String(now.getMinutes()).padStart(2, '0');
+                    var s = String(now.getSeconds()).padStart(2, '0');
+                    var el = document.getElementById('header-clock');
+                    var sh = document.getElementById('header-shift');
+                    if (el) el.textContent = h + ':' + m + ':' + s;
+                    if (sh) {
+                        var hr = now.getHours();
+                        if (hr >= 6 && hr < 14) sh.textContent = 'Morning Shift';
+                        else if (hr >= 14 && hr < 22) sh.textContent = 'Afternoon Shift';
+                        else sh.textContent = 'Off Hours';
+                    }
+                }, 1000);
+            }
             var now = new Date();
             var h = String(now.getHours()).padStart(2, '0');
             var m = String(now.getMinutes()).padStart(2, '0');
@@ -196,21 +218,47 @@ def _register_clientside_clock(app: object) -> None:
     )
 
 
+# Tenant-specific scaling factors for demo tenants
+_TENANT_SCALE: dict[str, dict] = {
+    "horse_renault": {"energy": 1.0, "occ": 1.0, "label": "CFT Aveiro"},
+    "airbus_assembly": {"energy": 12.5, "occ": 8.0, "label": "FAL A320"},
+    "ikea_logistics": {"energy": 35.0, "occ": 15.0, "label": "DC Almeirim"},
+}
+
+
 def _register_building_state_callback(app: object) -> None:
-    """Refresh building state every interval tick."""
+    """Refresh building state every interval tick, scaled by tenant."""
 
     @app.callback(
         Output("building-state-store", "data"),
         Input("data-refresh-interval", "n_intervals"),
+        Input("tenant-store", "data"),
     )
     @safe_callback
-    def refresh_building_state(_n: int) -> dict:
-        """Compute and store building state."""
+    def refresh_building_state(_n: int, tenant: str | None) -> dict:
+        """Compute and store building state with tenant scaling."""
         try:
             from core.spatial_kernel import compute_building_state
 
             state = compute_building_state()
-            return state.model_dump(mode="json")
+            data = state.model_dump(mode="json")
+
+            # Apply tenant-specific scaling for demo
+            scale = _TENANT_SCALE.get(tenant or "horse_renault", {})
+            e_scale = scale.get("energy", 1.0)
+            o_scale = scale.get("occ", 1.0)
+            if e_scale != 1.0 or o_scale != 1.0:
+                data["total_energy_kwh"] = round(
+                    (data.get("total_energy_kwh", 0) or 0) * e_scale, 4
+                )
+                data["total_occupancy"] = int(
+                    (data.get("total_occupancy", 0) or 0) * o_scale
+                )
+                bleed = data.get("total_financial_bleed_eur_hr", 0) or 0
+                data["total_financial_bleed_eur_hr"] = round(bleed * e_scale, 4)
+            # Attach tenant label for header display
+            data["_tenant_label"] = scale.get("label", "CFT Aveiro")
+            return data
         except Exception as e:
             logger.warning(f"Building state refresh error: {e}")
             return no_update
@@ -234,7 +282,7 @@ def _register_overview_kpi_callback(app: object) -> None:
             create_kpi_card("Operating Cost", "—", icon="mdi:currency-eur"),
             create_kpi_card("Occupancy", "—", icon="mdi:account-group"),
             create_kpi_card("Active Alerts", "—", icon="mdi:alert-circle-outline"),
-            create_kpi_card("Building Health", "—", icon="mdi:shield-check-outline"),
+            create_kpi_card("Zone Performance", "—", icon="mdi:shield-check-outline"),
         ]
 
         if not state_data:
@@ -276,7 +324,7 @@ def _register_overview_kpi_callback(app: object) -> None:
                     icon="mdi:alert-circle-outline",
                 ),
                 create_kpi_card(
-                    "Building Health",
+                    "Zone Performance",
                     f"{afi_freedom:.0f}",
                     unit="/100",
                     icon="mdi:shield-check-outline",
@@ -493,11 +541,67 @@ def _register_clientside_sidebar_toggle(app: object) -> None:
 
 
 def _register_tenant_sync(app: object) -> None:
-    """Sync tenant dropdown selection to the tenant store."""
+    """Sync tenant dropdown and update header building name."""
     app.clientside_callback(
-        "function(val) { return val; }",
+        """
+        function(val) {
+            var labels = {
+                'horse_renault': 'CFT Aveiro',
+                'airbus_assembly': 'FAL A320',
+                'ikea_logistics': 'DC Almeirim'
+            };
+            var el = document.getElementById('header-building-name');
+            if (el) el.textContent = labels[val] || 'CFT Aveiro';
+            return val;
+        }
+        """,
         Output("tenant-store", "data"),
         Input("tenant-selector", "value"),
+    )
+
+
+def _register_search_callback(app: object) -> None:
+    """Clientside fuzzy search: zone names → navigate, page names → redirect."""
+    app.clientside_callback(
+        """
+        function(searchValue) {
+            if (!searchValue || searchValue.length < 2)
+                return [window.dash_clientside.no_update,
+                        window.dash_clientside.no_update];
+            var q = searchValue.toLowerCase();
+            var pages = {
+                'energy': '/energy', 'comfort': '/comfort',
+                'occupancy': '/occupancy', 'booking': '/booking',
+                'simulation': '/simulation', 'reports': '/reports',
+                'insights': '/insights', 'settings': '/admin',
+                'deployment': '/deployment', '3d': '/building_3d',
+                '2d': '/view_2d', 'overview': '/'
+            };
+            for (var key in pages) {
+                if (key.indexOf(q) >= 0)
+                    return [pages[key],
+                            window.dash_clientside.no_update];
+            }
+            var zones = {
+                'multiusos': 0, 'biblioteca': 0, 'copa': 0,
+                'auditorio': 0, 'informatica': 0, 'formacao': 0,
+                'reuniao': 0, 'hall': 0,
+                'dojo': 1, 'sala a': 1, 'sala b': 1,
+                'sala c': 1, 'sala d': 1, 'reunioes': 1,
+                'arquivo': 1
+            };
+            for (var name in zones) {
+                if (name.indexOf(q) >= 0)
+                    return ['/', zones[name]];
+            }
+            return [window.dash_clientside.no_update,
+                    window.dash_clientside.no_update];
+        }
+        """,
+        Output("url", "pathname", allow_duplicate=True),
+        Output("active-floor-store", "data", allow_duplicate=True),
+        Input("global-search-input", "value"),
+        prevent_initial_call=True,
     )
 
 

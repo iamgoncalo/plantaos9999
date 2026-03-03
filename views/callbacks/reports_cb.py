@@ -383,11 +383,21 @@ def _register_savings_chart(app: object) -> None:
 
 
 def _register_pdf_download(app: object) -> None:
-    """Download PDF/HTML report when button is clicked."""
+    """Download report with confirmation dialog."""
+
+    @app.callback(
+        Output("reports-confirm-download", "displayed"),
+        Input("reports-download-pdf-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def show_download_confirm(n_clicks: int | None) -> bool:
+        """Open confirmation dialog before downloading report."""
+        return bool(n_clicks)
 
     @app.callback(
         Output("reports-pdf-download", "data"),
-        Input("reports-download-pdf-btn", "n_clicks"),
+        Input("reports-confirm-download", "submit_n_clicks"),
         State("reports-period", "value"),
         State("url", "pathname"),
         prevent_initial_call=True,

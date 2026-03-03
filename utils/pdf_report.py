@@ -1,20 +1,112 @@
 """PDF report generator for PlantaOS financial reports.
 
 Generates structured HTML-based PDF reports using the built-in
-Plotly kaleido export and basic HTML templating. Falls back to
-CSV export if PDF generation libraries are unavailable.
+Plotly kaleido export and basic HTML templating. Charts are rendered
+as base64-embedded PNG images via kaleido for offline viewing.
+Falls back to CSV export if generation fails.
 """
 
 from __future__ import annotations
 
+import base64
 from datetime import date, datetime
 
+import plotly.graph_objects as go
 from loguru import logger
 
 from config.afi_config import DEFAULT_AFI_CONFIG
 from config.building import get_monitored_zones, get_zone_by_id
 from core.afi_engine import compute_financial_bleed
 from data.store import store
+
+
+def _fig_to_base64(fig: go.Figure, width: int = 700, height: int = 350) -> str:
+    """Render a Plotly figure to a base64-encoded PNG string.
+
+    Args:
+        fig: Plotly figure to render.
+        width: Image width in pixels.
+        height: Image height in pixels.
+
+    Returns:
+        Base64 data URI string, or empty string on failure.
+    """
+    try:
+        img_bytes = fig.to_image(
+            format="png", width=width, height=height, engine="kaleido"
+        )
+        b64 = base64.b64encode(img_bytes).decode("utf-8")
+        return f"data:image/png;base64,{b64}"
+    except Exception as exc:
+        logger.debug(f"Chart image render failed: {exc}")
+        return ""
+
+
+def _build_breakdown_pie(
+    total_energy: float, total_human: float, total_window: float
+) -> str:
+    """Build cost breakdown pie chart as base64 image.
+
+    Args:
+        total_energy: Total energy cost.
+        total_human: Total productivity impact cost.
+        total_window: Total HVAC waste cost.
+
+    Returns:
+        HTML img tag or empty string.
+    """
+    values = [total_energy, total_human, total_window]
+    if sum(values) == 0:
+        return ""
+    fig = go.Figure(
+        go.Pie(
+            labels=["Energy Cost", "Productivity Impact", "HVAC Waste"],
+            values=values,
+            marker=dict(colors=["#0071E3", "#FF9500", "#FF3B30"]),
+            hole=0.45,
+            textinfo="label+percent",
+        )
+    )
+    fig.update_layout(
+        margin=dict(l=20, r=20, t=40, b=20),
+        title="Cost Breakdown",
+        paper_bgcolor="#FFFFFF",
+    )
+    src = _fig_to_base64(fig)
+    if src:
+        return f'<img src="{src}" style="max-width:100%;height:auto;" alt="Cost Breakdown">'
+    return ""
+
+
+def _build_zone_bar(zone_costs: list[dict]) -> str:
+    """Build zone ranking bar chart as base64 image.
+
+    Args:
+        zone_costs: List of dicts with 'name' and 'cost' keys.
+
+    Returns:
+        HTML img tag or empty string.
+    """
+    if not zone_costs:
+        return ""
+    top10 = sorted(zone_costs, key=lambda x: x["cost"], reverse=True)[:10]
+    names = [z["name"] for z in reversed(top10)]
+    costs = [z["cost"] for z in reversed(top10)]
+    fig = go.Figure(
+        go.Bar(x=costs, y=names, orientation="h", marker=dict(color="#0071E3"))
+    )
+    fig.update_layout(
+        margin=dict(l=120, r=20, t=40, b=20),
+        title="Cost by Zone (Top 10)",
+        xaxis_title="Cost (€)",
+        paper_bgcolor="#FFFFFF",
+    )
+    src = _fig_to_base64(fig, height=400)
+    if src:
+        return (
+            f'<img src="{src}" style="max-width:100%;height:auto;" alt="Zone Ranking">'
+        )
+    return ""
 
 
 def generate_report_html(
@@ -89,6 +181,35 @@ def generate_report_html(
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     zone_table = "\n".join(zone_rows)
 
+    # Build zone costs for chart
+    zone_costs = []
+    for zone_obj in zones:
+        try:
+            bleed = compute_financial_bleed(zone_obj.id)
+            zone_info = get_zone_by_id(zone_obj.id)
+            name = zone_info.name if zone_info else zone_obj.id
+            zone_costs.append(
+                {
+                    "name": name,
+                    "cost": bleed.total_bleed_eur_hr * period_hours,
+                }
+            )
+        except Exception:
+            pass
+
+    # Render embedded chart images
+    pie_chart_html = _build_breakdown_pie(total_energy, total_human, total_window)
+    bar_chart_html = _build_zone_bar(zone_costs)
+
+    charts_section = ""
+    if pie_chart_html or bar_chart_html:
+        charts_section = '<h2>Visual Analysis</h2><div class="chart-row">'
+        if pie_chart_html:
+            charts_section += f'<div class="chart-box">{pie_chart_html}</div>'
+        if bar_chart_html:
+            charts_section += f'<div class="chart-box">{bar_chart_html}</div>'
+        charts_section += "</div>"
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -115,9 +236,27 @@ def generate_report_html(
              font-size: 11px; color: #86868B; }}
   .savings {{ color: #34C759; font-weight: 600; }}
   .cost {{ color: #FF3B30; }}
+  .chart-row {{ display: flex; gap: 24px; flex-wrap: wrap; margin: 24px 0; }}
+  .chart-box {{ flex: 1; min-width: 300px; }}
+  .chart-box img {{ border-radius: 8px; border: 1px solid #E5E5EA; }}
+  .print-hint {{ background: #E8F0FE; color: #0071E3; padding: 12px 16px;
+                  border-radius: 8px; font-size: 13px; margin-bottom: 24px; }}
+  @media print {{
+    body {{ margin: 20px; font-size: 11px; }}
+    .print-hint {{ display: none; }}
+    .kpi-row {{ gap: 8px; }}
+    .kpi-box {{ padding: 10px; }}
+    h1 {{ font-size: 20px; }}
+    h2 {{ font-size: 15px; margin-top: 20px; }}
+    table {{ font-size: 11px; }}
+    .chart-row {{ page-break-inside: avoid; }}
+    .footer {{ font-size: 9px; }}
+    @page {{ margin: 15mm; }}
+  }}
 </style>
 </head>
 <body>
+<div class="print-hint">To save as PDF: press Ctrl+P (or Cmd+P on Mac) and select "Save as PDF".</div>
 <h1>PlantaOS Financial Report</h1>
 <p class="subtitle">Centro de Formação Técnica HORSE/Renault — Aveiro, Portugal</p>
 <p class="subtitle">Period: {period_label} · Generated: {now_str}</p>
@@ -174,6 +313,8 @@ physics-based models. Key cost components:</p>
   <li><b>Productivity Impact</b> — comfort deviation × occupants × wage × impact factor</li>
   <li><b>Operating Cost</b> = Energy + HVAC Waste + Productivity Impact</li>
 </ul>
+
+{charts_section}
 
 <div class="footer">
   PlantaOS — Building Intelligence Platform · Generated automatically ·

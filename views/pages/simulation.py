@@ -76,8 +76,12 @@ def create_simulation_page() -> html.Div:
         style={"marginBottom": f"{GAP_ELEMENT}px"},
     )
 
-    # ── Hidden store for simulation results ────
+    # ── Hidden store + confirm dialog ────
     result_store = dcc.Store(id="sim-result-store", storage_type="memory")
+    confirm_dialog = dcc.ConfirmDialog(
+        id="sim-confirm-dialog",
+        message="Run this optimization scenario? This may take a moment.",
+    )
 
     # ── Left panel: Scenario Configuration ─────
     zone_options = [{"label": z.name, "value": z.id} for z in get_monitored_zones()]
@@ -265,7 +269,35 @@ def create_simulation_page() -> html.Div:
                 ],
                 style={"marginBottom": "20px"},
             ),
-            # Zone selector
+            # Scope selector
+            html.Div(
+                [
+                    html.Label(
+                        "Scope",
+                        style={
+                            "fontSize": "13px",
+                            "fontWeight": 500,
+                            "color": TEXT_SECONDARY,
+                            "marginBottom": "8px",
+                            "display": "block",
+                        },
+                    ),
+                    dcc.RadioItems(
+                        id="sim-scope-selector",
+                        options=[
+                            {"label": "Whole Building", "value": "building"},
+                            {"label": "Piso 0", "value": "floor_0"},
+                            {"label": "Piso 1", "value": "floor_1"},
+                            {"label": "Specific Zone", "value": "zone"},
+                        ],
+                        value="zone",
+                        className="time-range-selector",
+                        inline=True,
+                    ),
+                ],
+                style={"marginBottom": "16px"},
+            ),
+            # Zone selector (visible only when scope = "zone")
             html.Div(
                 [
                     html.Label(
@@ -287,6 +319,7 @@ def create_simulation_page() -> html.Div:
                         style={"fontSize": "13px"},
                     ),
                 ],
+                id="sim-zone-selector-wrapper",
                 style={"marginBottom": "20px"},
             ),
             # Optimization level slider
@@ -395,7 +428,7 @@ def create_simulation_page() -> html.Div:
     )
 
     return html.Div(
-        [result_store, page_header, two_col],
+        [result_store, confirm_dialog, page_header, two_col],
         className="page-enter",
         style={
             "display": "flex",

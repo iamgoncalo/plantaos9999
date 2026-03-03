@@ -282,7 +282,7 @@ def _create_hover_trace(
             lines.append(f"CO2: {co2:.0f} ppm")
         lines.append(f"Occupancy: {occ}/{cap}")
         lines.append(f"Energy: {energy:.2f} kWh")
-        lines.append(f"Building Health: {freedom:.0f}/100")
+        lines.append(f"Zone Performance: {freedom:.0f}/100")
         bleed_val = zone_data.get("financial_bleed", 0) or zone_data.get(
             "financial_bleed_eur_hr", 0
         )
@@ -396,7 +396,7 @@ def _create_color_legend() -> go.Scatter:
             cmin=0,
             cmax=100,
             colorbar=dict(
-                title=dict(text="Building Health", font=dict(size=11)),
+                title=dict(text="Zone Performance", font=dict(size=11)),
                 thickness=12,
                 len=0.5,
                 x=1.02,

@@ -133,8 +133,12 @@ def create_reports_page() -> html.Div:
                 ],
                 className="chart-grid",
             ),
-            # PDF download component (hidden)
+            # PDF download component (hidden) + confirm dialog
             dcc.Download(id="reports-pdf-download"),
+            dcc.ConfirmDialog(
+                id="reports-confirm-download",
+                message="Download the financial report?",
+            ),
         ],
         className="page-enter",
         style={"display": "flex", "flexDirection": "column", "gap": "16px"},

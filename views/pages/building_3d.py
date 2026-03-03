@@ -21,7 +21,7 @@ def create_building_3d_page() -> html.Div:
     metric_selector = dcc.RadioItems(
         id="3d-metric-selector",
         options=[
-            {"label": "Building Health", "value": "freedom_index"},
+            {"label": "Zone Performance", "value": "freedom_index"},
             {"label": "Temperature", "value": "temperature_c"},
             {"label": "Occupancy", "value": "occupant_count"},
             {"label": "Energy", "value": "total_energy_kwh"},

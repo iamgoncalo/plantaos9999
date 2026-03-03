@@ -251,24 +251,27 @@ def create_deployment_page() -> html.Div:
                                     "margin": "16px 0",
                                 },
                             ),
-                            # Sensor deployment floorplan
+                            # Sensor placement map
                             html.Div(
-                                html.Span(
-                                    "Sensor deployment map will render here.",
-                                    style={
-                                        "fontSize": "13px",
-                                        "color": TEXT_TERTIARY,
-                                    },
-                                ),
-                                id="deploy-sensor-map",
-                                style={
-                                    "minHeight": "200px",
-                                    "display": "flex",
-                                    "alignItems": "center",
-                                    "justifyContent": "center",
-                                    "background": "#FAFAFA",
-                                    "borderRadius": "12px",
-                                },
+                                [
+                                    html.Div(
+                                        "Sensor Placement Map",
+                                        style={
+                                            "fontSize": "14px",
+                                            "fontWeight": 600,
+                                            "color": TEXT_PRIMARY,
+                                            "marginBottom": "8px",
+                                        },
+                                    ),
+                                    dcc.Graph(
+                                        id="deploy-sensor-map",
+                                        config={
+                                            "displaylogo": False,
+                                            "displayModeBar": False,
+                                        },
+                                        style={"height": "300px"},
+                                    ),
+                                ],
                             ),
                         ],
                         className="card",
@@ -406,6 +409,38 @@ def create_deployment_page() -> html.Div:
                         id="deploy-roi-summary",
                         children=html.Span(
                             "Enter values above to calculate ROI.",
+                            style={
+                                "color": TEXT_TERTIARY,
+                                "fontSize": "13px",
+                            },
+                        ),
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
+                },
+            ),
+            # ── CapEx vs OpEx Summary ──────────────
+            html.Div(
+                [
+                    html.H3(
+                        "CapEx vs OpEx Summary",
+                        style={
+                            "fontSize": "16px",
+                            "fontWeight": 600,
+                            "color": TEXT_PRIMARY,
+                            "marginBottom": "16px",
+                            "marginTop": 0,
+                        },
+                    ),
+                    html.Div(
+                        id="deploy-capex-opex",
+                        children=html.Span(
+                            "ROI data will appear here when sensor inputs are provided.",
                             style={
                                 "color": TEXT_TERTIARY,
                                 "fontSize": "13px",

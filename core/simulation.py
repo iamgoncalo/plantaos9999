@@ -14,7 +14,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from config.afi_config import AFIConfig, DEFAULT_AFI_CONFIG
-from config.building import get_zone_by_id
+from config.building import get_monitored_zones, get_zone_by_id, get_zones_by_floor
 from data.physical_ai_bridge import (
     PhysicsSimConfig,
     RoomPhysicsState,
@@ -546,6 +546,109 @@ def _simulate_hvac_failure_analytical(
             f"HVAC failure in {zone_name}: "
             f"\u20ac{cumulative:.2f} over {duration_hours}h"
         ),
+    )
+
+
+def simulate_scope(
+    event_type: str,
+    scope: str,
+    intensity: float = 0.8,
+    duration_hours: int = 24,
+    step_minutes: int = 15,
+    config: AFIConfig | None = None,
+) -> SimulationResult:
+    """Run simulation across a scope: building, floor, or single zone.
+
+    Args:
+        event_type: Event type string (e.g. 'hvac_failure').
+        scope: One of 'building', 'floor_0', 'floor_1', or a zone_id.
+        intensity: Event intensity 0.0-1.0.
+        duration_hours: Simulation duration in hours.
+        step_minutes: Time between steps in minutes.
+        config: Optional AFI config override.
+
+    Returns:
+        Aggregated SimulationResult across all zones in scope.
+    """
+    # Resolve zones in scope
+    if scope == "building":
+        zones = [z for z in get_monitored_zones() if z.has_hvac]
+    elif scope == "floor_0":
+        zones = [z for z in get_zones_by_floor(0) if z.has_sensors]
+    elif scope == "floor_1":
+        zones = [z for z in get_zones_by_floor(1) if z.has_sensors]
+    else:
+        # Treat as single zone_id
+        event = SimulationEvent(
+            event_type=event_type, zone_id=scope, intensity=intensity
+        )
+        return simulate_event(event, duration_hours, step_minutes, config)
+
+    if not zones:
+        return SimulationResult(
+            event=SimulationEvent(
+                event_type=event_type,
+                zone_id=zones[0].id if zones else "unknown",
+                intensity=intensity,
+            ),
+            summary="No zones found for scope",
+        )
+
+    # Simulate each zone and aggregate
+    results: list[SimulationResult] = []
+    for z in zones:
+        ev = SimulationEvent(event_type=event_type, zone_id=z.id, intensity=intensity)
+        results.append(simulate_event(ev, duration_hours, step_minutes, config))
+
+    # Aggregate: sum financial damage, union affected zones, average timelines
+    total_damage = sum(r.total_financial_damage_eur for r in results)
+    all_affected: list[str] = []
+    for r in results:
+        for zid in r.zones_affected:
+            if zid not in all_affected:
+                all_affected.append(zid)
+
+    # Build averaged timeline from first result's step count
+    ref = results[0]
+    n_steps = len(ref.timeline)
+    agg_timeline: list[SimulationStep] = []
+
+    for i in range(n_steps):
+        temps = [r.timeline[i].temperature_c for r in results if i < len(r.timeline)]
+        co2s = [r.timeline[i].co2_ppm for r in results if i < len(r.timeline)]
+        costs = [
+            r.timeline[i].cumulative_cost_eur for r in results if i < len(r.timeline)
+        ]
+        n = len(temps) or 1
+
+        agg_timeline.append(
+            SimulationStep(
+                step=i,
+                minutes_elapsed=i * step_minutes,
+                temperature_c=round(sum(temps) / n, 1),
+                co2_ppm=round(sum(co2s) / n, 0),
+                occupant_count=0,
+                distortion=1.0,
+                financial_damage_eur=0.0,
+                cumulative_cost_eur=round(sum(costs), 2),
+                freedom=1.0,
+            )
+        )
+
+    scope_label = {
+        "building": "Whole Building",
+        "floor_0": "Piso 0",
+        "floor_1": "Piso 1",
+    }.get(scope, scope)
+
+    return SimulationResult(
+        event=SimulationEvent(
+            event_type=event_type, zone_id=zones[0].id, intensity=intensity
+        ),
+        timeline=agg_timeline,
+        total_financial_damage_eur=round(total_damage, 2),
+        zones_affected=all_affected,
+        summary=f"{scope_label}: €{total_damage:.0f} across {len(zones)} zones",
     )
 
 

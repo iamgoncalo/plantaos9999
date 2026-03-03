@@ -167,8 +167,18 @@ def create_admin_page() -> html.Div:
     """
     return html.Div(
         [
-            # -- Session store ------------------------------------
+            # -- Session store + confirm dialogs --------------------
             dcc.Store(id="admin-settings-store", storage_type="session"),
+            dcc.ConfirmDialog(
+                id="admin-confirm-save",
+                message="Save these settings?",
+            ),
+            dcc.ConfirmDialog(
+                id="admin-confirm-regen",
+                message=(
+                    "Regenerate all synthetic data? This will take about 10 seconds."
+                ),
+            ),
             # -- Header -------------------------------------------
             html.Div(
                 [
@@ -339,6 +349,39 @@ def create_admin_page() -> html.Div:
                     html.Div(
                         id="admin-regen-status",
                         style={"marginTop": "12px"},
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
+                    "marginTop": f"{GAP_ELEMENT}px",
+                },
+            ),
+            # -- System Health ----------------------------------
+            html.Div(
+                [
+                    html.H3(
+                        "System Health",
+                        style={
+                            "fontSize": "16px",
+                            "fontWeight": 600,
+                            "color": TEXT_PRIMARY,
+                            "marginBottom": "12px",
+                            "marginTop": 0,
+                        },
+                    ),
+                    html.Div(
+                        id="admin-system-health",
+                        children=html.Span(
+                            "Loading system health...",
+                            style={
+                                "color": TEXT_TERTIARY,
+                                "fontSize": "13px",
+                            },
+                        ),
                     ),
                 ],
                 className="card",

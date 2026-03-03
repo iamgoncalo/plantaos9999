@@ -48,7 +48,7 @@ def create_view_2d_page() -> html.Div:
     metric_selector = dcc.RadioItems(
         id="view2d-metric-selector",
         options=[
-            {"label": "Building Health", "value": "freedom_index"},
+            {"label": "Zone Performance", "value": "freedom_index"},
             {"label": "Temperature", "value": "temperature_c"},
             {"label": "CO2", "value": "co2_ppm"},
             {"label": "Energy", "value": "total_energy_kwh"},

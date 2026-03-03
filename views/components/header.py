@@ -34,10 +34,28 @@ def create_header(
     left = html.Div(
         [
             hamburger,
-            html.H1(
-                id="header-title",
-                children="Overview",
-                className="header-title",
+            html.Div(
+                [
+                    html.H1(
+                        id="header-title",
+                        children="Overview",
+                        className="header-title",
+                    ),
+                    html.Span(
+                        id="header-building-name",
+                        children="CFT Aveiro",
+                        style={
+                            "fontSize": "12px",
+                            "color": TEXT_SECONDARY,
+                            "fontWeight": 400,
+                        },
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "2px",
+                },
             ),
         ],
         className="header-left",

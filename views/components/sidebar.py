@@ -163,7 +163,7 @@ def create_sidebar(active_page: str = "overview") -> html.Div:
                 [
                     html.Span(className="status-dot healthy"),
                     html.Span(
-                        "Building Health",
+                        "Zone Performance",
                         style={
                             "fontSize": FONT_SIZE_XS,
                             "fontWeight": WEIGHT_SEMIBOLD,

@@ -40,12 +40,12 @@ def create_insights_page() -> html.Div:
                     html.Div(
                         [
                             DashIconify(
-                                icon="mdi:brain",
+                                icon="mdi:lightbulb-on-outline",
                                 width=24,
                                 color=ACCENT_BLUE,
                             ),
                             html.H2(
-                                "AI Insights",
+                                "System Intelligence",
                                 style={
                                     "margin": 0,
                                     "fontSize": "20px",

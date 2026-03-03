@@ -23,7 +23,7 @@ from config.theme import (
     TEXT_SECONDARY,
     TEXT_TERTIARY,
 )
-from core.simulation import SimulationEvent, SimulationResult, simulate_event
+from core.simulation import SimulationResult, simulate_scope
 from views.charts import apply_chart_theme, empty_chart
 from views.components.kpi_card import create_kpi_card
 from views.components.safe_callback import safe_callback
@@ -35,10 +35,36 @@ def register_simulation_callbacks(app: object) -> None:
     Args:
         app: The Dash application instance.
     """
+    _register_scope_toggle(app)
     _register_trigger(app)
     _register_timeline(app)
     _register_damage_summary(app)
     _register_affected_zones(app)
+
+
+# ═══════════════════════════════════════════════
+# Callback 0: Scope Toggle (show/hide zone dropdown)
+# ═══════════════════════════════════════════════
+
+
+def _register_scope_toggle(app: object) -> None:
+    """Toggle zone selector visibility based on scope selection.
+
+    Args:
+        app: The Dash application instance.
+    """
+    app.clientside_callback(
+        """
+        function(scope) {
+            if (scope === 'zone') {
+                return {'marginBottom': '20px', 'display': 'block'};
+            }
+            return {'marginBottom': '20px', 'display': 'none'};
+        }
+        """,
+        Output("sim-zone-selector-wrapper", "style"),
+        Input("sim-scope-selector", "value"),
+    )
 
 
 # ═══════════════════════════════════════════════
@@ -47,9 +73,9 @@ def register_simulation_callbacks(app: object) -> None:
 
 
 def _register_trigger(app: object) -> None:
-    """Register the callback that triggers a simulation run.
+    """Register the confirm dialog + simulation trigger callbacks.
 
-    Listens for button clicks on sim-trigger-btn and creates a
+    Button click opens a confirm dialog. On confirmation, creates a
     SimulationEvent from the form state, runs simulate_event(),
     and stores the serialized result in sim-result-store.
 
@@ -58,9 +84,20 @@ def _register_trigger(app: object) -> None:
     """
 
     @app.callback(
-        Output("sim-result-store", "data"),
+        Output("sim-confirm-dialog", "displayed"),
         Input("sim-trigger-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def show_sim_confirm(n_clicks: int | None) -> bool:
+        """Open confirmation dialog before running simulation."""
+        return bool(n_clicks)
+
+    @app.callback(
+        Output("sim-result-store", "data"),
+        Input("sim-confirm-dialog", "submit_n_clicks"),
         State("sim-event-type", "value"),
+        State("sim-scope-selector", "value"),
         State("sim-zone-selector", "value"),
         State("sim-intensity-slider", "value"),
         State("url", "pathname"),
@@ -70,6 +107,7 @@ def _register_trigger(app: object) -> None:
     def trigger_simulation(
         n_clicks: int | None,
         event_type: str | None,
+        scope: str | None,
         zone_id: str | None,
         intensity: float | None,
         pathname: str | None,
@@ -79,7 +117,8 @@ def _register_trigger(app: object) -> None:
         Args:
             n_clicks: Button click count.
             event_type: Selected event type string.
-            zone_id: Selected zone identifier.
+            scope: Scope selector value (building/floor_0/floor_1/zone).
+            zone_id: Selected zone identifier (used when scope='zone').
             intensity: Intensity slider value (0.1-1.0).
             pathname: Current page URL path.
 
@@ -89,20 +128,25 @@ def _register_trigger(app: object) -> None:
         if pathname != "/simulation":
             return no_update
 
-        if not n_clicks or not event_type or not zone_id:
+        if not n_clicks or not event_type:
+            return no_update
+
+        scope = scope or "zone"
+        effective_scope = zone_id if scope == "zone" else scope
+
+        if scope == "zone" and not zone_id:
             return no_update
 
         try:
-            event = SimulationEvent(
+            result: SimulationResult = simulate_scope(
                 event_type=event_type,
-                zone_id=zone_id,
+                scope=effective_scope,
                 intensity=intensity or 0.8,
-            )
-            result: SimulationResult = simulate_event(
-                event, duration_hours=24, step_minutes=15
+                duration_hours=24,
+                step_minutes=15,
             )
             logger.info(
-                f"Simulation complete: {event_type} in {zone_id}, "
+                f"Simulation complete: {event_type} scope={effective_scope}, "
                 f"damage=€{result.total_financial_damage_eur:.2f}"
             )
             return result.model_dump(mode="json")

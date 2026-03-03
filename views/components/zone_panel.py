@@ -227,7 +227,7 @@ def create_zone_detail(
             ),
             html.Div(
                 [
-                    html.Div("Building Health", className="zone-freedom-label"),
+                    html.Div("Zone Performance", className="zone-freedom-label"),
                     html.Div(
                         html.Div(
                             className="freedom-bar-fill",

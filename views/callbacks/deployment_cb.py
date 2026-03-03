@@ -1,19 +1,22 @@
 """Deployment page callbacks.
 
-Registers callbacks for real-time AFI formula tuning and impact preview.
+Registers callbacks for real-time performance tuning and impact preview.
 Slider changes are aggregated into an AFIConfig stored in dcc.Store,
-then a second callback computes before/after Freedom and financial bleed
+then a second callback computes before/after performance and operating cost
 comparisons using the AFI engine.
 """
 
 from __future__ import annotations
 
+import plotly.graph_objects as go
 from dash import Input, Output, State, html, no_update
 from dash_iconify import DashIconify
 from loguru import logger
 
 from config.afi_config import AFIConfig, DEFAULT_AFI_CONFIG
-from core.afi_engine import compute_building_afi
+from config.building import get_monitored_zones
+from core.afi_engine import compute_building_afi, compute_financial_bleed
+from views.charts import apply_chart_theme
 from views.components.kpi_card import create_kpi_card
 from views.components.safe_callback import safe_callback
 
@@ -27,6 +30,8 @@ def register_deployment_callbacks(app: object) -> None:
     _register_config_update(app)
     _register_impact_preview(app)
     _register_roi_calculator(app)
+    _register_sensor_map(app)
+    _register_capex_opex(app)
 
 
 def _register_config_update(app: object) -> None:
@@ -85,7 +90,7 @@ def _register_config_update(app: object) -> None:
 
 
 def _register_impact_preview(app: object) -> None:
-    """Compute before/after AFI comparison when config store changes."""
+    """Compute before/after performance comparison when config store changes."""
 
     @app.callback(
         Output("deploy-impact-preview", "children"),
@@ -99,7 +104,7 @@ def _register_impact_preview(app: object) -> None:
         n_intervals: int | None,
         pathname: str | None,
     ) -> html.Div:
-        """Render before/after Freedom and bleed comparison.
+        """Render before/after performance and cost comparison.
 
         Args:
             config_data: Serialized AFIConfig from the store.
@@ -115,7 +120,7 @@ def _register_impact_preview(app: object) -> None:
         if not config_data:
             return html.Div(
                 "Adjust parameters to preview the impact on "
-                "Freedom and financial bleed.",
+                "performance and operating cost.",
                 style={"fontSize": "13px", "color": "#6E6E73"},
             )
 
@@ -356,5 +361,244 @@ def _register_roi_calculator(app: object) -> None:
             logger.warning(f"ROI calculator error: {exc}")
             return html.Span(
                 "Error calculating ROI.",
+                style={"color": "#FF3B30", "fontSize": "13px"},
+            )
+
+
+def _register_sensor_map(app: object) -> None:
+    """Render sensor placement map on the floorplan.
+
+    Prioritizes high-bleed zones for sensor placement and overlays
+    sensor markers on a simplified floorplan.
+
+    Args:
+        app: The Dash application instance.
+    """
+
+    @app.callback(
+        Output("deploy-sensor-map", "figure"),
+        Input("deploy-sensor-count", "value"),
+        Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
+    )
+    @safe_callback
+    def update_sensor_map(
+        sensor_count: int | None,
+        _n: int,
+        pathname: str | None,
+    ) -> go.Figure:
+        """Build sensor placement figure.
+
+        Args:
+            sensor_count: Number of sensors to place.
+            _n: Interval tick.
+            pathname: Current URL.
+
+        Returns:
+            Plotly figure with zone rectangles and sensor markers.
+        """
+        if pathname != "/deployment":
+            return no_update
+
+        from views.floorplan.zones_geometry import get_zone_center
+
+        n_sensors = int(sensor_count or 16)
+        zones = get_monitored_zones()
+
+        # Rank zones by financial bleed (highest first)
+        zone_bleed: list[dict] = []
+        for z in zones:
+            try:
+                bleed = compute_financial_bleed(z.id)
+                total = bleed.total_bleed_eur_hr
+            except Exception:
+                total = 0.0
+            cx, cy = get_zone_center(z.id)
+            zone_bleed.append(
+                {
+                    "id": z.id,
+                    "name": z.name,
+                    "bleed": total,
+                    "cx": cx,
+                    "cy": cy,
+                    "floor": z.floor,
+                }
+            )
+
+        zone_bleed.sort(key=lambda x: x["bleed"], reverse=True)
+
+        fig = go.Figure()
+
+        # Plot all zone centers as small dots
+        all_x = [z["cx"] for z in zone_bleed if z["cx"] != 0]
+        all_y = [z["cy"] for z in zone_bleed if z["cy"] != 0]
+        all_names = [z["name"] for z in zone_bleed if z["cx"] != 0]
+
+        fig.add_trace(
+            go.Scatter(
+                x=all_x,
+                y=all_y,
+                mode="markers+text",
+                marker=dict(size=8, color="#E5E5EA"),
+                text=all_names,
+                textposition="top center",
+                textfont=dict(size=9, color="#86868B"),
+                hovertemplate="%{text}<extra></extra>",
+                name="Zones",
+            )
+        )
+
+        # Overlay sensor icons on top N zones
+        sensor_zones = [z for z in zone_bleed if z["cx"] != 0][:n_sensors]
+
+        if sensor_zones:
+            fig.add_trace(
+                go.Scatter(
+                    x=[z["cx"] for z in sensor_zones],
+                    y=[z["cy"] for z in sensor_zones],
+                    mode="markers",
+                    marker=dict(
+                        size=14,
+                        color="#0071E3",
+                        symbol="diamond",
+                        line=dict(width=2, color="#FFFFFF"),
+                    ),
+                    text=[z["name"] for z in sensor_zones],
+                    hovertemplate=(
+                        "%{text}<br>Bleed: €%{customdata:.4f}/hr<extra></extra>"
+                    ),
+                    customdata=[z["bleed"] for z in sensor_zones],
+                    name="Sensors",
+                )
+            )
+
+        fig.update_layout(
+            showlegend=True,
+            legend=dict(orientation="h", y=-0.1),
+        )
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False, scaleanchor="x")
+
+        return apply_chart_theme(
+            fig, f"Sensor Placement ({n_sensors} sensors)", height=280
+        )
+
+
+def _register_capex_opex(app: object) -> None:
+    """Register the CapEx vs OpEx summary callback.
+
+    Args:
+        app: The Dash application instance.
+    """
+
+    @app.callback(
+        Output("deploy-capex-opex", "children"),
+        Input("deploy-sensor-count", "value"),
+        Input("deploy-sensor-cost", "value"),
+        Input("deploy-install-cost", "value"),
+        Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
+    )
+    @safe_callback
+    def update_capex_opex(
+        sensor_count: int | None,
+        sensor_cost: float | None,
+        install_cost: float | None,
+        _n: int,
+        pathname: str | None,
+    ) -> html.Div:
+        """Build CapEx vs OpEx comparison.
+
+        Args:
+            sensor_count: Number of sensors.
+            sensor_cost: Cost per sensor in EUR.
+            install_cost: One-time installation cost.
+            _n: Interval tick.
+            pathname: Current URL.
+
+        Returns:
+            Dash html.Div with CapEx/OpEx comparison cards.
+        """
+        if pathname != "/deployment":
+            return no_update
+
+        try:
+            n_sensors = int(sensor_count or 16)
+            cost_each = float(sensor_cost or 150)
+            install = float(install_cost or 2000)
+
+            hardware_capex = n_sensors * cost_each + install
+            monthly_platform = 99.0  # SaaS platform fee estimate
+
+            # Current operating cost from bleed
+            try:
+                afi = compute_building_afi()
+                hourly_bleed = afi.total_financial_bleed_eur_hr
+            except Exception:
+                hourly_bleed = 3.0
+
+            monthly_opex = hourly_bleed * 720 + monthly_platform
+            reduction_pct = min(0.5, 0.02 * n_sensors)
+            monthly_savings = hourly_bleed * reduction_pct * 720
+            annual_benefit = monthly_savings * 12 - hardware_capex
+
+            return html.Div(
+                [
+                    html.Div(
+                        [
+                            create_kpi_card(
+                                title="Hardware CapEx",
+                                value=f"€{hardware_capex:,.0f}",
+                                icon="mdi:chip",
+                            ),
+                            create_kpi_card(
+                                title="Platform Fee",
+                                value=f"€{monthly_platform:.0f}",
+                                unit="/mo",
+                                icon="mdi:cloud-outline",
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "gap": "12px",
+                            "flexWrap": "wrap",
+                            "marginBottom": "12px",
+                        },
+                    ),
+                    html.Div(
+                        [
+                            create_kpi_card(
+                                title="Current Monthly OpEx",
+                                value=f"€{monthly_opex:,.0f}",
+                                icon="mdi:cash-minus",
+                            ),
+                            create_kpi_card(
+                                title="Est. Monthly Savings",
+                                value=f"€{monthly_savings:,.0f}",
+                                icon="mdi:piggy-bank-outline",
+                            ),
+                            create_kpi_card(
+                                title="Net Annual Benefit",
+                                value=f"€{annual_benefit:+,.0f}",
+                                trend=(
+                                    (annual_benefit / hardware_capex * 100)
+                                    if hardware_capex > 0
+                                    else 0.0
+                                ),
+                                icon="mdi:chart-line",
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "gap": "12px",
+                            "flexWrap": "wrap",
+                        },
+                    ),
+                ],
+            )
+        except Exception as exc:
+            logger.warning(f"CapEx/OpEx error: {exc}")
+            return html.Span(
+                "Error calculating summary.",
                 style={"color": "#FF3B30", "fontSize": "13px"},
             )

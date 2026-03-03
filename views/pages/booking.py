@@ -60,7 +60,7 @@ def create_booking_page() -> html.Div:
                 },
             ),
             html.P(
-                "Temporal Intelligence Engine",
+                "Plan, analyze, and optimize room bookings.",
                 style={
                     "margin": "8px 0 0",
                     "color": TEXT_SECONDARY,

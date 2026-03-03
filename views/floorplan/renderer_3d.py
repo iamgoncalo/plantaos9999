@@ -3,6 +3,10 @@
 Generates a self-contained HTML page with an inline Three.js r128 scene
 that renders the CFT building in 3D with interactive zone selection,
 metric overlays, and OrbitControls. Embedded via Dash html.Iframe srcdoc.
+
+Zone meshes use ExtrudeGeometry from real polygon outlines (DWG coordinates)
+rather than bounding-box approximations. Click events are relayed to the
+parent Dash frame via postMessage.
 """
 
 from __future__ import annotations
@@ -25,12 +29,13 @@ from views.floorplan.zones_geometry import (
     FLOOR_1_ZONES,
     FLOOR_HEIGHT_M,
     FLOOR_WIDTH_M,
+    get_zone_geometry,
 )
 
 # Abbreviated names for compact 3D labels (mirrors renderer_2d.py)
 _NAME_SHORT: dict[str, str] = {
     "Sala Multiusos": "Multiusos",
-    "Biblioteca / Espolio HORSE": "Biblioteca",
+    "Biblioteca": "Biblioteca",
     "Zona Social / Copa": "Copa",
     "Sala Formacao 1": "Form. 1",
     "Sala Formacao 2": "Form. 2",
@@ -163,12 +168,12 @@ def generate_3d_html(
 
   // -- Scene setup -----------------------------------------
   var scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xf8fafc, 80, 180);
+  scene.fog = new THREE.Fog(0xf8fafc, 80, 200);
 
   var camera = new THREE.PerspectiveCamera(
     40, window.innerWidth / window.innerHeight, 0.5, 250
   );
-  camera.position.set(45, 35, 45);
+  camera.position.set(60, 35, 40);
 
   var renderer = new THREE.WebGLRenderer({{
     antialias: true,
@@ -188,7 +193,7 @@ def generate_3d_html(
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.minDistance = 15;
-  controls.maxDistance = 100;
+  controls.maxDistance = 120;
   controls.maxPolarAngle = Math.PI / 2.2;
   controls.target.set({cam_target_x:.1f}, {cam_target_y:.1f}, {cam_target_z:.1f});
   controls.update();
@@ -253,15 +258,15 @@ def generate_3d_html(
   scene.add(ambient);
 
   var dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
-  dirLight.position.set(35, 45, 40);
+  dirLight.position.set(45, 50, 30);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.set(2048, 2048);
-  dirLight.shadow.camera.left = -55;
-  dirLight.shadow.camera.right = 55;
+  dirLight.shadow.camera.left = -60;
+  dirLight.shadow.camera.right = 60;
   dirLight.shadow.camera.top = 30;
   dirLight.shadow.camera.bottom = -30;
   dirLight.shadow.camera.near = 1;
-  dirLight.shadow.camera.far = 120;
+  dirLight.shadow.camera.far = 140;
   dirLight.shadow.bias = -0.001;
   dirLight.shadow.radius = 4;
   scene.add(dirLight);
@@ -270,7 +275,7 @@ def generate_3d_html(
   scene.add(hemiLight);
 
   // -- Ground plane ----------------------------------------
-  var groundGeo = new THREE.PlaneGeometry(70, 40);
+  var groundGeo = new THREE.PlaneGeometry(100, 40);
   var groundMat = new THREE.MeshStandardMaterial({{
     color: 0xeef1f5,
     roughness: 0.95,
@@ -283,7 +288,7 @@ def generate_3d_html(
   scene.add(ground);
 
   // -- Grid lines ------------------------------------------
-  var gridHelper = new THREE.GridHelper(65, 13, 0xd0d5dd, 0xe0e4ea);
+  var gridHelper = new THREE.GridHelper(100, 20, 0xd0d5dd, 0xe0e4ea);
   gridHelper.position.set({cam_target_x:.1f}, -0.04, {cam_target_z:.1f});
   scene.add(gridHelper);
 
@@ -315,9 +320,21 @@ def generate_3d_html(
     return new THREE.Color(hex);
   }}
 
-  function addZone(id, name, cx, yBase, cz, w, h, d, colorHex, metricsJson, opacity) {{
+  function addZone(id, name, points, yBase, wallHeight, colorHex, metricsJson, opacity) {{
+    // Build THREE.Shape from polygon points (building x -> three.x, building y -> three.z)
+    var shape = new THREE.Shape();
+    shape.moveTo(points[0][0], points[0][1]);
+    for (var i = 1; i < points.length; i++) {{
+      shape.lineTo(points[i][0], points[i][1]);
+    }}
+    shape.closePath();
+
+    var extrudeSettings = {{ depth: wallHeight, bevelEnabled: false }};
+    var geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    // Rotate so extrusion goes up along Y axis (default is along Z)
+    geo.rotateX(-Math.PI / 2);
+
     var color = hexToThreeColor(colorHex);
-    var geo = new THREE.BoxGeometry(w, h, d);
     var mat = new THREE.MeshStandardMaterial({{
       color: color,
       roughness: 0.6,
@@ -326,7 +343,7 @@ def generate_3d_html(
       opacity: opacity
     }});
     var mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(cx, yBase + h / 2, cz);
+    mesh.position.set(0, yBase, 0);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.userData = {{
@@ -350,8 +367,16 @@ def generate_3d_html(
     edges.position.copy(mesh.position);
     scene.add(edges);
 
-    // -- Label sprite --
+    // -- Label sprite at polygon centroid --
     if (name && name !== "") {{
+      var cx = 0, cz = 0;
+      for (var j = 0; j < points.length; j++) {{
+        cx += points[j][0];
+        cz += points[j][1];
+      }}
+      cx /= points.length;
+      cz /= points.length;
+
       var canvas = document.createElement("canvas");
       canvas.width = 256;
       canvas.height = 64;
@@ -386,7 +411,7 @@ def generate_3d_html(
         depthTest: false
       }});
       var sprite = new THREE.Sprite(spriteMat);
-      sprite.position.set(cx, yBase + h + 0.6, cz);
+      sprite.position.set(cx, yBase + wallHeight + 0.6, cz);
       sprite.scale.set(3.5, 0.875, 1);
       scene.add(sprite);
       labelSprites.push(sprite);
@@ -396,11 +421,12 @@ def generate_3d_html(
   // -- Add zone meshes (generated from Python) -------------
   {zone_js}
 
-  // -- Raycaster (hover) -----------------------------------
+  // -- Raycaster (hover + click) ---------------------------
   var raycaster = new THREE.Raycaster();
   var mouse = new THREE.Vector2();
   var tooltip = document.getElementById("tooltip");
   var hoveredMesh = null;
+  var selectedMesh = null;
 
   function onMouseMove(event) {{
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -467,6 +493,40 @@ def generate_3d_html(
 
   window.addEventListener("mousemove", onMouseMove, false);
 
+  // -- Click handler: zone selection + postMessage to Dash --
+  window.addEventListener("click", function(event) {{
+    if (isFPS) return;
+    raycaster.setFromCamera(mouse, camera);
+    var intersects = raycaster.intersectObjects(zoneMeshes);
+    if (intersects.length > 0) {{
+      var clickedMesh = intersects[0].object;
+      var zoneId = clickedMesh.userData.zoneId;
+
+      // Reset previous selection
+      if (selectedMesh && selectedMesh !== clickedMesh) {{
+        selectedMesh.material.opacity = selectedMesh.userData.baseOpacity;
+        selectedMesh.material.emissive.setHex(0x000000);
+        selectedMesh.material.emissiveIntensity = 0;
+      }}
+
+      // Highlight selected zone
+      zoneMeshes.forEach(function(m) {{
+        if (m !== clickedMesh) {{
+          m.material.opacity = m.userData.baseOpacity;
+          m.material.emissive.setHex(0x000000);
+          m.material.emissiveIntensity = 0;
+        }}
+      }});
+      clickedMesh.material.opacity = 1.0;
+      clickedMesh.material.emissive.setHex(0x0071E3);
+      clickedMesh.material.emissiveIntensity = 0.2;
+      selectedMesh = clickedMesh;
+
+      // Notify parent Dash frame
+      window.parent.postMessage({{type: "zone-click", zoneId: zoneId}}, "*");
+    }}
+  }});
+
   // -- Window resize ---------------------------------------
   window.addEventListener("resize", function() {{
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -492,8 +552,8 @@ def generate_3d_html(
       // Clamp Y to eye level
       camera.position.y = 1.6;
       // Clamp to building bounds
-      camera.position.x = Math.max(0, Math.min(camera.position.x, 48.4));
-      camera.position.z = Math.max(0, Math.min(camera.position.z, 15));
+      camera.position.x = Math.max(0, Math.min(camera.position.x, {FLOOR_WIDTH_M}));
+      camera.position.z = Math.max(0, Math.min(camera.position.z, {FLOOR_HEIGHT_M}));
       prevTime = time;
     }} else {{
       controls.update();
@@ -504,7 +564,7 @@ def generate_3d_html(
 
   // -- Public API for reset camera -------------------------
   window.resetCamera = function() {{
-    camera.position.set(45, 35, 45);
+    camera.position.set(60, 35, 40);
     controls.target.set({cam_target_x:.1f}, {cam_target_y:.1f}, {cam_target_z:.1f});
     controls.update();
   }};
@@ -547,19 +607,15 @@ def _build_zone_meshes_js(
 
     for floor_num, zone_id, polygon in floor_zones:
         zone_info = get_zone_by_id(zone_id)
-        name = zone_info.name if zone_info else zone_id
+        zone_geo = get_zone_geometry(zone_id)
+        name = zone_info.name if zone_info else (zone_geo.name if zone_geo else zone_id)
         short_name = _NAME_SHORT.get(name, name)
-        capacity = zone_info.capacity if zone_info else 0
+        capacity = (
+            zone_info.capacity if zone_info else (zone_geo.capacity if zone_geo else 0)
+        )
 
-        # Bounding box
-        xs = [p[0] for p in polygon]
-        ys = [p[1] for p in polygon]
-        x_min, x_max = min(xs) + _ZONE_PADDING, max(xs) - _ZONE_PADDING
-        y_min, y_max = min(ys) + _ZONE_PADDING, max(ys) - _ZONE_PADDING
-        w = x_max - x_min
-        d = y_max - y_min
-        cx = (x_min + x_max) / 2
-        cz = (y_min + y_max) / 2
+        # Apply padding to polygon points to create visible gap between rooms
+        padded = _inset_polygon(polygon, _ZONE_PADDING)
 
         # Y offset and wall height based on floor
         if floor_num == 0:
@@ -582,10 +638,12 @@ def _build_zone_meshes_js(
         # Only show labels for zones with capacity > 0
         label = short_name if capacity > 0 else ""
 
+        # Pass polygon points as JSON array for ExtrudeGeometry
+        points_json = json.dumps(padded)
+
         lines.append(
-            f'  addZone("{zone_id}", "{label}", '
-            f"{cx:.2f}, {y_base:.2f}, {cz:.2f}, "
-            f"{w:.2f}, {wall_h:.2f}, {d:.2f}, "
+            f'  addZone("{zone_id}", "{label}", {points_json}, '
+            f"{y_base:.2f}, {wall_h:.2f}, "
             f'"{color}", {metrics_json}, {opacity});'
         )
 
@@ -601,6 +659,9 @@ def _build_zone_meshes_js(
                 freedom_color = STATUS_WARNING
             else:
                 freedom_color = STATUS_CRITICAL
+            # Compute centroid for sprite placement
+            cx = sum(p[0] for p in polygon) / len(polygon)
+            cz = sum(p[1] for p in polygon) / len(polygon)
             sprite_y = y_base + wall_h + 1.5
             lines.append(
                 f"  (function() {{\n"
@@ -631,6 +692,40 @@ def _build_zone_meshes_js(
             )
 
     return "\n".join(lines)
+
+
+def _inset_polygon(
+    polygon: list[tuple[float, float]],
+    inset: float,
+) -> list[list[float]]:
+    """Shrink a polygon inward by a uniform amount.
+
+    Simple bounding-box-based inset for rectangular polygons.
+    Returns list-of-lists (JSON-serializable) rather than tuples.
+
+    Args:
+        polygon: Original polygon vertices.
+        inset: Inset distance in meters.
+
+    Returns:
+        Inset polygon as list of [x, y] pairs.
+    """
+    xs = [p[0] for p in polygon]
+    ys = [p[1] for p in polygon]
+    cx = sum(xs) / len(xs)
+    cy = sum(ys) / len(ys)
+
+    result: list[list[float]] = []
+    for x, y in polygon:
+        dx = x - cx
+        dy = y - cy
+        length = (dx * dx + dy * dy) ** 0.5
+        if length > 0:
+            factor = max(0, (length - inset)) / length
+            result.append([cx + dx * factor, cy + dy * factor])
+        else:
+            result.append([x, y])
+    return result
 
 
 def _get_zone_color(

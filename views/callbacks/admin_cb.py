@@ -1,8 +1,8 @@
 """Admin settings page callbacks.
 
 Registers callbacks for saving configuration settings (energy cost,
-hourly wage, API key), triggering synthetic data regeneration, and
-displaying system health status.
+hourly wage, API key), triggering synthetic data regeneration,
+displaying system health status, audit log, and role settings.
 """
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ def register_admin_callbacks(app: object) -> None:
     _register_regen_data(app)
     _register_clear_bookings(app)
     _register_system_health(app)
+    _register_audit_log(app)
+    _register_role_settings(app)
 
 
 def _register_save_settings(app: object) -> None:
@@ -211,9 +213,7 @@ def _register_system_health(app: object) -> None:
         if pathname != "/admin":
             return no_update
 
-        from config.theme import (
-            TEXT_SECONDARY,
-        )
+        from config.theme import TEXT_SECONDARY
         from data.store import store
         from views.components.kpi_card import create_kpi_card
 
@@ -283,3 +283,196 @@ def _register_system_health(app: object) -> None:
                 ),
             ]
         )
+
+
+def _register_audit_log(app: object) -> None:
+    """Render audit log viewer and handle clear action."""
+
+    @app.callback(
+        Output("admin-audit-log-viewer", "children"),
+        Input("audit-log-store", "data"),
+        State("url", "pathname"),
+    )
+    @safe_callback
+    def render_audit_log(
+        audit_data: list | None,
+        pathname: str | None,
+    ) -> html.Div:
+        """Render the last 20 audit log entries as a table.
+
+        Args:
+            audit_data: List of audit log entry dicts.
+            pathname: Current page URL path.
+
+        Returns:
+            Dash component with audit log table or empty message.
+        """
+        if pathname != "/admin":
+            return no_update
+
+        if not audit_data:
+            return html.Span(
+                "No audit entries yet. Actions like sensor changes, "
+                "tenant switches, and exports are logged here.",
+                style={
+                    "color": "#86868B",
+                    "fontSize": "13px",
+                },
+            )
+
+        # Show last 20 entries, newest first
+        entries = list(audit_data[-20:])
+        entries.reverse()
+
+        header = html.Thead(
+            html.Tr(
+                [
+                    html.Th(
+                        col,
+                        style={
+                            "textAlign": "left",
+                            "padding": "8px 12px",
+                            "fontSize": "12px",
+                            "fontWeight": 600,
+                            "color": "#86868B",
+                            "borderBottom": "1px solid #E5E5EA",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.5px",
+                        },
+                    )
+                    for col in ["Timestamp", "Action", "User", "Details"]
+                ]
+            )
+        )
+
+        rows = []
+        for entry in entries:
+            rows.append(
+                html.Tr(
+                    [
+                        html.Td(
+                            entry.get("timestamp", "")[:19],
+                            style={
+                                "padding": "8px 12px",
+                                "fontSize": "13px",
+                                "color": "#6E6E73",
+                                "fontFamily": "JetBrains Mono",
+                            },
+                        ),
+                        html.Td(
+                            entry.get("action", ""),
+                            style={
+                                "padding": "8px 12px",
+                                "fontSize": "13px",
+                                "fontWeight": 500,
+                                "color": "#1D1D1F",
+                            },
+                        ),
+                        html.Td(
+                            entry.get("user", "Admin"),
+                            style={
+                                "padding": "8px 12px",
+                                "fontSize": "13px",
+                                "color": "#6E6E73",
+                            },
+                        ),
+                        html.Td(
+                            entry.get("details", ""),
+                            style={
+                                "padding": "8px 12px",
+                                "fontSize": "13px",
+                                "color": "#6E6E73",
+                            },
+                        ),
+                    ],
+                    style={"borderBottom": "1px solid #F2F2F7"},
+                )
+            )
+
+        body = html.Tbody(rows)
+        return html.Table(
+            [header, body],
+            style={
+                "width": "100%",
+                "borderCollapse": "collapse",
+            },
+        )
+
+    @app.callback(
+        Output("admin-confirm-clear-audit", "displayed"),
+        Input("admin-clear-audit-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def show_clear_audit_confirm(n_clicks: int | None) -> bool:
+        """Open confirmation dialog before clearing audit log."""
+        return bool(n_clicks)
+
+    @app.callback(
+        Output("audit-log-store", "data", allow_duplicate=True),
+        Input("admin-confirm-clear-audit", "submit_n_clicks"),
+        State("url", "pathname"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def clear_audit_log(
+        n_clicks: int | None,
+        pathname: str | None,
+    ) -> list:
+        """Clear all audit log entries.
+
+        Args:
+            n_clicks: Confirm dialog submit click count.
+            pathname: Current URL path.
+
+        Returns:
+            Empty list to clear the audit store.
+        """
+        if n_clicks is None:
+            raise PreventUpdate
+        if pathname != "/admin":
+            return no_update
+        logger.info("Audit log cleared from admin page")
+        return []
+
+
+def _register_role_settings(app: object) -> None:
+    """Persist role-related settings (require password toggle, camera)."""
+
+    @app.callback(
+        Output("admin-settings-store", "data", allow_duplicate=True),
+        Input("admin-require-password", "value"),
+        Input("admin-camera-toggle", "value"),
+        State("admin-settings-store", "data"),
+        State("url", "pathname"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def save_role_settings(
+        password_val: list | None,
+        camera_val: list | None,
+        current_settings: dict | None,
+        pathname: str | None,
+    ) -> dict:
+        """Persist toggle states to admin-settings-store.
+
+        Args:
+            password_val: Checklist value for require-password toggle.
+            camera_val: Checklist value for camera toggle.
+            current_settings: Current stored settings dict.
+            pathname: Current URL path.
+
+        Returns:
+            Updated settings dict.
+        """
+        if pathname != "/admin":
+            return no_update
+
+        settings_data = current_settings or {}
+        settings_data["require_password"] = "require_password" in (password_val or [])
+        settings_data["camera_enabled"] = "enabled" in (camera_val or [])
+        logger.info(
+            f"Role settings updated: password={settings_data['require_password']}, "
+            f"camera={settings_data['camera_enabled']}"
+        )
+        return settings_data

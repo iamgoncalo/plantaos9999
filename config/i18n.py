@@ -19,9 +19,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "nav.view_data": "Data Explorer",
         "nav.booking": "Booking",
         "nav.simulation": "Simulation",
-        "nav.insights": "Guidance",
+        "nav.insights": "Insights",
         "nav.reports": "Reports",
-        "nav.deployment": "Deployment",
+        "nav.sensors": "Sensors",
+        "nav.flow": "Flow",
+        "nav.heatmap": "Heatmap",
+        "nav.building_3d_walk": "3D Walk",
         "nav.admin": "Settings",
         # Header
         "header.search": "Search zones, metrics, pages...",
@@ -43,7 +46,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "page.energy": "Energy",
         "page.comfort": "Comfort",
         "page.occupancy": "Occupancy",
-        "page.insights": "Guidance",
+        "page.insights": "Insights",
         "page.building_3d": "3D Building",
         "page.view_2d": "2D Map",
         "page.view_4d": "4D Explorer",
@@ -52,7 +55,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "page.view_data": "Data Explorer",
         "page.simulation": "Simulation",
         "page.reports": "Reports",
-        "page.deployment": "Deployment",
+        "page.sensors": "Sensors",
+        "page.view_flow": "Flow",
+        "page.view_heatmap": "Heatmap",
+        "page.building_3d_walk": "3D Walk",
         "page.booking": "Smart Booking",
         "page.admin": "Settings",
         # Booking
@@ -93,11 +99,16 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "emergency.evac_time": "Estimated Evacuation Time",
         "emergency.people_at_risk": "People at Risk",
         "emergency.exit_routes": "Exit Routes Available",
-        # Sensor Coverage
-        "sensors.title": "Sensor Coverage",
+        # Sensors
+        "sensors.title": "Sensors",
         "sensors.coverage_map": "Coverage Map",
         "sensors.deployment": "Deployment Status",
         "sensors.battery": "Battery Health",
+        "sensors.inventory": "Sensor Inventory",
+        "sensors.add_device": "Add Device",
+        "sensors.remove_device": "Remove Device",
+        "sensors.commission": "Commission Sensor",
+        "sensors.health": "Sensor Health",
         # Data Explorer
         "data.title": "Data Explorer",
         "data.dataset": "Dataset",
@@ -107,6 +118,20 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # 4D Explorer
         "4d.title": "4D Time Explorer",
         "4d.subtitle": "Explore building metrics across time",
+        # Tenant
+        "tenant.confirm_switch": "Confirm Tenant Switch",
+        "tenant.switch_message": (
+            "Switching tenant will change all building data,"
+            " reports, and configurations. Are you sure?"
+        ),
+        # View pages
+        "view.flow_title": "Flow Analysis",
+        "view.heatmap_title": "Heatmap View",
+        # Settings - Privacy
+        "settings.privacy": "Privacy & Data Policy",
+        "settings.audit_log": "Audit Log",
+        "settings.data_minimization": "Data Minimization",
+        "settings.camera_policy": "Camera Policy",
         # General
         "general.no_data": "No data available",
         "general.loading": "Loading...",
@@ -127,9 +152,12 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "nav.view_data": "Explorador Dados",
         "nav.booking": "Reservas",
         "nav.simulation": "Simula\u00e7\u00e3o",
-        "nav.insights": "Orienta\u00e7\u00e3o",
+        "nav.insights": "Percepcoes",
         "nav.reports": "Relat\u00f3rios",
-        "nav.deployment": "Implementa\u00e7\u00e3o",
+        "nav.sensors": "Sensores",
+        "nav.flow": "Fluxo",
+        "nav.heatmap": "Mapa Calor",
+        "nav.building_3d_walk": "Passeio 3D",
         "nav.admin": "Defini\u00e7\u00f5es",
         # Cabe\u00e7alho
         "header.search": "Pesquisar zonas, m\u00e9tricas, p\u00e1ginas...",
@@ -151,7 +179,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "page.energy": "Energia",
         "page.comfort": "Conforto",
         "page.occupancy": "Ocupa\u00e7\u00e3o",
-        "page.insights": "Orienta\u00e7\u00e3o",
+        "page.insights": "Percepcoes",
         "page.building_3d": "Edif\u00edcio 3D",
         "page.view_2d": "Mapa 2D",
         "page.view_4d": "Explorador 4D",
@@ -160,7 +188,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "page.view_data": "Explorador Dados",
         "page.simulation": "Simula\u00e7\u00e3o",
         "page.reports": "Relat\u00f3rios",
-        "page.deployment": "Implementa\u00e7\u00e3o",
+        "page.sensors": "Sensores",
+        "page.view_flow": "Fluxo",
+        "page.view_heatmap": "Mapa Calor",
+        "page.building_3d_walk": "Passeio 3D",
         "page.booking": "Reserva Inteligente",
         "page.admin": "Defini\u00e7\u00f5es",
         # Reservas
@@ -201,11 +232,16 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "emergency.evac_time": "Tempo Evacua\u00e7\u00e3o Estimado",
         "emergency.people_at_risk": "Pessoas em Risco",
         "emergency.exit_routes": "Sa\u00eddas Dispon\u00edveis",
-        # Cobertura Sensores
-        "sensors.title": "Cobertura Sensores",
+        # Sensores
+        "sensors.title": "Sensores",
         "sensors.coverage_map": "Mapa Cobertura",
         "sensors.deployment": "Estado Implementa\u00e7\u00e3o",
         "sensors.battery": "Sa\u00fade Bateria",
+        "sensors.inventory": "Inventario Sensores",
+        "sensors.add_device": "Adicionar Dispositivo",
+        "sensors.remove_device": "Remover Dispositivo",
+        "sensors.commission": "Comissionar Sensor",
+        "sensors.health": "Saude Sensor",
         # Explorador Dados
         "data.title": "Explorador Dados",
         "data.dataset": "Conjunto Dados",
@@ -215,6 +251,20 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # Explorador 4D
         "4d.title": "Explorador Temporal 4D",
         "4d.subtitle": "Explore m\u00e9tricas do edif\u00edcio ao longo do tempo",
+        # Inquilino
+        "tenant.confirm_switch": "Confirmar Mudanca de Inquilino",
+        "tenant.switch_message": (
+            "Mudar de inquilino altera todos os dados do edificio,"
+            " relatorios e configuracoes. Tem a certeza?"
+        ),
+        # Paginas de visualizacao
+        "view.flow_title": "Analise de Fluxo",
+        "view.heatmap_title": "Mapa de Calor",
+        # Definicoes - Privacidade
+        "settings.privacy": "Privacidade & Politica de Dados",
+        "settings.audit_log": "Registo de Auditoria",
+        "settings.data_minimization": "Minimizacao de Dados",
+        "settings.camera_policy": "Politica de Camaras",
         # Geral
         "general.no_data": "Sem dados dispon\u00edveis",
         "general.loading": "A carregar...",

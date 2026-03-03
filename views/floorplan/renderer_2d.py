@@ -30,39 +30,35 @@ from views.floorplan.zones_geometry import (
     FLOOR_HEIGHT_M,
     FLOOR_WIDTH_M,
     get_zone_center,
+    get_zone_geometry,
 )
 
 # Abbreviated names for compact zone labels
 _NAME_SHORT: dict[str, str] = {
     "Sala Multiusos": "Multiusos",
-    "Biblioteca / Espolio HORSE": "Biblioteca",
+    "Biblioteca": "Biblioteca",
     "Zona Social / Copa": "Copa",
-    "Sala Formacao": "Formacao",
+    "Sala Formacao 1": "Form. 1",
+    "Sala Formacao 2": "Form. 2",
+    "Sala Formacao 3": "Form. 3",
     "Sala Reuniao": "Reuniao",
     "Sala Informatica": "Informatica",
     "Sala Dojo Seguranca": "Dojo",
-    "Sala Reunioes": "Reunioes",
-    "Sala A": "Sala A",
-    "Sala B": "Sala B",
-    "Sala C": "Sala C",
-    "Sala D": "Sala D",
-    "Recepcao": "Recepcao",
-    "Auditorio": "Auditorio",
-    "Arrumos": "Arrumos",
+    "Sala Grande": "Sala Grande",
+    "Sala Pequena": "Sala Peq.",
+    "Exibicao Armazem": "Armazem",
 }
 
 # Team-color mapping: zone type → dot color for occupancy visualization
 _ZONE_TEAM_COLORS: dict[str, str] = {
     "p0_informatica": "#5856D6",  # Engineering (purple)
     "p1_dojo": STATUS_CRITICAL,  # Safety (red)
-    "p0_sala": STATUS_HEALTHY,  # Training (green)
-    "p0_auditorio": STATUS_HEALTHY,
     "p0_reuniao": "#5856D6",  # Management (purple)
-    "p1_sala_a": STATUS_HEALTHY,
-    "p1_sala_b": STATUS_HEALTHY,
-    "p1_sala_c": STATUS_HEALTHY,
-    "p1_sala_d": STATUS_HEALTHY,
-    "p1_reunioes": "#5856D6",
+    "p0_formacao1": STATUS_HEALTHY,  # Training (green)
+    "p0_formacao2": STATUS_HEALTHY,
+    "p0_formacao3": STATUS_HEALTHY,
+    "p1_salagrande": STATUS_HEALTHY,
+    "p1_salapequena": "#5856D6",  # Meetings (purple)
 }
 
 
@@ -110,7 +106,8 @@ def render_floorplan_2d(
 
         # Zone label (with €/hr if available)
         zone_info = get_zone_by_id(zone_id)
-        name = zone_info.name if zone_info else zone_id
+        zone_geo = get_zone_geometry(zone_id)
+        name = zone_info.name if zone_info else (zone_geo.name if zone_geo else zone_id)
         center = get_zone_center(zone_id)
         fig.add_trace(
             _create_zone_label(zone_id, name, center, occ if occ else None, bleed)

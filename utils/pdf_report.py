@@ -550,6 +550,18 @@ def generate_report_pdf(
         elements.append(Paragraph(f"\u2022  {bullet}", style_body))
     elements.append(Spacer(1, 16))
 
+    # ── Building photos placeholder ──────────────
+    elements.append(Paragraph("Building Reference", style_heading))
+    elements.append(
+        Paragraph(
+            "Building photos will be available in the next release. "
+            "The CFT HORSE/Renault facility in Aveiro comprises two floors "
+            "with training rooms, social areas, and technical spaces.",
+            style_body,
+        )
+    )
+    elements.append(Spacer(1, 12))
+
     # ── Footer info ────────────────────────────
     elements.append(Spacer(1, 8))
     elements.append(

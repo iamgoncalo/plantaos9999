@@ -29,6 +29,22 @@ from views.callbacks.view_data_cb import register_data_explorer_callbacks
 from views.callbacks.view_emergency_cb import register_emergency_callbacks
 from views.callbacks.view_sensors_cb import register_sensor_coverage_callbacks
 
+# Optional callback modules (created by other agents)
+try:
+    from views.callbacks.sensors_cb import register_sensors_callbacks
+except ImportError:
+    register_sensors_callbacks = None
+
+try:
+    from views.callbacks.view_flow_cb import register_flow_callbacks
+except ImportError:
+    register_flow_callbacks = None
+
+try:
+    from views.callbacks.view_heatmap_cb import register_heatmap_callbacks
+except ImportError:
+    register_heatmap_callbacks = None
+
 
 # Page title mapping: pathname → display title
 _PAGE_TITLES: dict[str, str] = {
@@ -37,16 +53,19 @@ _PAGE_TITLES: dict[str, str] = {
     "/energy": "Energy",
     "/comfort": "Comfort",
     "/occupancy": "Occupancy",
-    "/insights": "Guidance",
+    "/insights": "Insights",
     "/building_3d": "3D Building",
+    "/building_3d_walk": "3D Walk",
     "/view_2d": "2D Map",
     "/view_4d": "4D Explorer",
     "/view_sensors": "Sensor Coverage",
     "/view_emergency": "Emergency Mode",
     "/view_data": "Data Explorer",
+    "/view_flow": "Flow",
+    "/view_heatmap": "Heatmap",
     "/simulation": "Simulation",
     "/reports": "Reports",
-    "/deployment": "Deployment",
+    "/sensors": "Sensors",
     "/booking": "Smart Booking",
     "/admin": "Settings",
 }
@@ -70,7 +89,7 @@ def register_callbacks(app: object) -> None:
     _register_clientside_sidebar_toggle(app)
     _register_sidebar_active(app)
     _register_view_submenu_toggle(app)
-    _register_tenant_sync(app)
+    _register_tenant_confirmation(app)
     _register_search_callback(app)
     _register_notification_dropdown(app)
     _register_lang_selector(app)
@@ -91,6 +110,13 @@ def register_callbacks(app: object) -> None:
     register_data_explorer_callbacks(app)
     register_booking_callbacks(app)
     register_admin_callbacks(app)
+    # Optional callback modules (created by other agents)
+    if register_sensors_callbacks is not None:
+        register_sensors_callbacks(app)
+    if register_flow_callbacks is not None:
+        register_flow_callbacks(app)
+    if register_heatmap_callbacks is not None:
+        register_heatmap_callbacks(app)
 
 
 def _register_routing_callback(app: object) -> None:
@@ -122,7 +148,23 @@ def _register_routing_callback(app: object) -> None:
             from views.pages.view_emergency import create_emergency_page
             from views.pages.view_sensors import create_sensor_coverage_page
 
-            page_map = {
+            # Optional page imports (created by other agents)
+            try:
+                from views.pages.sensors import create_sensors_page
+            except ImportError:
+                create_sensors_page = None
+
+            try:
+                from views.pages.view_flow import create_flow_page
+            except ImportError:
+                create_flow_page = None
+
+            try:
+                from views.pages.view_heatmap import create_heatmap_page
+            except ImportError:
+                create_heatmap_page = None
+
+            page_map: dict = {
                 "/": create_overview_page,
                 "/overview": create_overview_page,
                 "/energy": create_energy_page,
@@ -130,6 +172,7 @@ def _register_routing_callback(app: object) -> None:
                 "/occupancy": create_occupancy_page,
                 "/insights": create_insights_page,
                 "/building_3d": create_building_3d_page,
+                "/building_3d_walk": create_building_3d_page,
                 "/view_2d": create_view_2d_page,
                 "/view_4d": create_view_4d_page,
                 "/view_sensors": create_sensor_coverage_page,
@@ -141,6 +184,14 @@ def _register_routing_callback(app: object) -> None:
                 "/booking": create_booking_page,
                 "/admin": create_admin_page,
             }
+
+            # Add optional pages if available
+            if create_sensors_page is not None:
+                page_map["/sensors"] = create_sensors_page
+            if create_flow_page is not None:
+                page_map["/view_flow"] = create_flow_page
+            if create_heatmap_page is not None:
+                page_map["/view_heatmap"] = create_heatmap_page
 
             title = _PAGE_TITLES.get(pathname, "Not Found")
             creator = page_map.get(pathname)
@@ -452,7 +503,12 @@ def _register_zone_click_callback(app: object) -> None:
             for point in points:
                 cd = point.get("customdata")
                 if cd:
-                    zone_id = cd if isinstance(cd, str) else cd[0] if cd else None
+                    if isinstance(cd, str):
+                        zone_id = cd
+                    elif isinstance(cd, (list, tuple)) and len(cd) > 0:
+                        zone_id = cd[0]
+                    else:
+                        zone_id = None
                     break
 
             if not zone_id:
@@ -572,14 +628,16 @@ def _register_sidebar_active(app: object) -> None:
                 '/energy': 'energy', '/comfort': 'comfort',
                 '/occupancy': 'occupancy', '/insights': 'insights',
                 '/simulation': 'simulation', '/reports': 'reports',
-                '/deployment': 'deployment', '/admin': 'admin',
+                '/sensors': 'sensors', '/admin': 'admin',
                 '/booking': 'booking',
                 '/view_2d': 'view_2d', '/building_3d': 'building_3d',
+                '/building_3d_walk': 'building_3d_walk',
                 '/view_4d': 'view_4d', '/view_sensors': 'view_sensors',
-                '/view_emergency': 'view_emergency', '/view_data': 'view_data'
+                '/view_emergency': 'view_emergency', '/view_data': 'view_data',
+                '/view_flow': 'view_flow', '/view_heatmap': 'view_heatmap'
             };
             var activeId = map[pathname] || 'overview';
-            var viewSubs = ['view_2d', 'building_3d', 'view_4d', 'view_sensors', 'view_emergency', 'view_data'];
+            var viewSubs = ['view_2d', 'building_3d', 'building_3d_walk', 'view_4d', 'view_sensors', 'view_emergency', 'view_data', 'view_flow', 'view_heatmap'];
             var isViewPage = viewSubs.indexOf(activeId) >= 0;
 
             document.querySelectorAll('.sidebar-nav-item').forEach(function(el) {
@@ -627,24 +685,69 @@ def _register_view_submenu_toggle(app: object) -> None:
     )
 
 
-def _register_tenant_sync(app: object) -> None:
-    """Sync tenant dropdown and update header building name."""
-    app.clientside_callback(
-        """
-        function(val) {
-            var labels = {
-                'horse_renault': 'CFT Aveiro',
-                'airbus_assembly': 'FAL A320',
-                'ikea_logistics': 'DC Almeirim'
-            };
-            var el = document.getElementById('header-building-name');
-            if (el) el.textContent = labels[val] || 'CFT Aveiro';
-            return val;
-        }
-        """,
-        Output("tenant-store", "data"),
+def _register_tenant_confirmation(app: object) -> None:
+    """Register tenant switch with confirmation dialog.
+
+    Step A: tenant-selector change -> store pending value + show confirm dialog
+    Step B: confirm -> copy pending to tenant-store
+    Step C: cancel -> revert tenant-selector to current tenant-store
+    """
+    _tenant_labels: dict[str, str] = {
+        "horse_renault": "CFT Aveiro",
+        "airbus_assembly": "FAL A320",
+        "ikea_logistics": "DC Almeirim",
+    }
+
+    @app.callback(
+        Output("tenant-pending-store", "data"),
+        Output("tenant-confirm-dialog", "displayed"),
         Input("tenant-selector", "value"),
+        State("tenant-store", "data"),
+        prevent_initial_call=True,
     )
+    @safe_callback
+    def tenant_selector_changed(
+        new_val: str | None,
+        current_tenant: str | None,
+    ) -> tuple:
+        """Store pending tenant and show confirmation dialog."""
+        if not new_val or new_val == current_tenant:
+            return no_update, False
+        return new_val, True
+
+    @app.callback(
+        Output("tenant-store", "data"),
+        Output("header-building-name", "children"),
+        Input("tenant-confirm-dialog", "submit_n_clicks"),
+        State("tenant-pending-store", "data"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def tenant_confirmed(
+        submit_n: int | None,
+        pending: str | None,
+    ) -> tuple:
+        """Copy pending tenant to tenant-store on confirmation."""
+        if not submit_n or not pending:
+            return no_update, no_update
+        label = _tenant_labels.get(pending, "CFT Aveiro")
+        return pending, label
+
+    @app.callback(
+        Output("tenant-selector", "value"),
+        Input("tenant-confirm-dialog", "cancel_n_clicks"),
+        State("tenant-store", "data"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def tenant_cancelled(
+        cancel_n: int | None,
+        current_tenant: str | None,
+    ) -> str:
+        """Revert tenant-selector to current tenant on cancel."""
+        if not cancel_n:
+            return no_update
+        return current_tenant or "horse_renault"
 
 
 def _register_search_callback(app: object) -> None:

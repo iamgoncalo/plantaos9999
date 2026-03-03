@@ -21,9 +21,13 @@ from config.theme import (
     STATUS_WARNING,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
-    TEXT_TERTIARY,
 )
 from core.simulation import SimulationResult, simulate_scope
+from utils.simulation_helpers import (
+    SCENARIO_ROI,
+    empty_affected_zones,
+    empty_damage_summary,
+)
 from views.charts import apply_chart_theme, empty_chart
 from views.components.kpi_card import create_kpi_card
 from views.components.safe_callback import safe_callback
@@ -312,7 +316,7 @@ def _register_damage_summary(app: object) -> None:
             Dash html.Div containing four KPI cards in a grid-4 layout.
         """
         if not result_data:
-            return _empty_damage_summary()
+            return empty_damage_summary()
 
         try:
             total_damage = result_data.get("total_financial_damage_eur", 0.0)
@@ -363,20 +367,7 @@ def _register_damage_summary(app: object) -> None:
                 )
 
             # Optimization mode: per-scenario ROI data
-            _SCENARIO_ROI = {
-                "hvac_failure": {"invest": 0, "impl": "1-3", "desc": "HVAC schedule"},
-                "open_window": {"invest": 200, "impl": "3-5", "desc": "Window sensors"},
-                "mass_entry": {"invest": 0, "impl": "1-3", "desc": "Occupancy plan"},
-                "hvac_night_off": {
-                    "invest": 0,
-                    "impl": "1-2",
-                    "desc": "Schedule change",
-                },
-                "presence_sensors": {"invest": 2400, "impl": "7-14", "desc": "Sensors"},
-                "setpoint_adjust": {"invest": 0, "impl": "1", "desc": "Config change"},
-                "zone_consolidation": {"invest": 0, "impl": "3-7", "desc": "Policy"},
-            }
-            roi = _SCENARIO_ROI.get(event_type, {})
+            roi = SCENARIO_ROI.get(event_type, {})
             invest = roi.get("invest", 0)
 
             # For optimization scenarios total_damage IS monthly savings
@@ -416,7 +407,7 @@ def _register_damage_summary(app: object) -> None:
             )
         except Exception as exc:
             logger.error(f"Savings summary render error: {exc}")
-            return _empty_damage_summary()
+            return empty_damage_summary()
 
 
 # ═══════════════════════════════════════════════
@@ -455,12 +446,12 @@ def _register_affected_zones(app: object) -> None:
             Dash html.Div containing a card with zone badges.
         """
         if not result_data:
-            return _empty_affected_zones()
+            return empty_affected_zones()
 
         try:
             zones_affected = result_data.get("zones_affected", [])
             if not zones_affected:
-                return _empty_affected_zones()
+                return empty_affected_zones()
 
             badge_items: list[html.Span] = []
             for i, zone_id in enumerate(zones_affected):
@@ -530,82 +521,4 @@ def _register_affected_zones(app: object) -> None:
             )
         except Exception as exc:
             logger.error(f"Affected zones render error: {exc}")
-            return _empty_affected_zones()
-
-
-# ═══════════════════════════════════════════════
-# Private Helpers
-# ═══════════════════════════════════════════════
-
-
-def _empty_damage_summary() -> html.Div:
-    """Return placeholder KPI cards for the savings summary.
-
-    Returns:
-        Dash html.Div with placeholder KPI cards showing '--' values.
-    """
-    return html.Div(
-        [
-            create_kpi_card(
-                title="Monthly Savings",
-                value="--",
-                unit="€",
-                icon="mdi:piggy-bank-outline",
-            ),
-            create_kpi_card(
-                title="Implementation",
-                value="--",
-                unit="days",
-                icon="mdi:clock-outline",
-            ),
-            create_kpi_card(
-                title="Comfort Impact",
-                value="--",
-                icon="mdi:thermometer-check",
-            ),
-            create_kpi_card(
-                title="Zones Affected",
-                value="--",
-                icon="mdi:map-marker-alert-outline",
-            ),
-        ],
-        className="grid-4",
-    )
-
-
-def _empty_affected_zones() -> html.Div:
-    """Return placeholder for the affected zones section.
-
-    Returns:
-        Dash html.Div with empty state message.
-    """
-    return html.Div(
-        html.Div(
-            [
-                DashIconify(
-                    icon="mdi:information-outline",
-                    width=20,
-                    color=TEXT_TERTIARY,
-                ),
-                html.Span(
-                    "Run a simulation to see affected zones and cascade effects.",
-                    style={
-                        "color": TEXT_TERTIARY,
-                        "fontSize": "13px",
-                    },
-                ),
-            ],
-            style={
-                "display": "flex",
-                "alignItems": "center",
-                "gap": "8px",
-                "padding": "16px 20px",
-            },
-        ),
-        className="card",
-        style={
-            "background": BG_CARD,
-            "borderRadius": CARD_RADIUS,
-            "boxShadow": CARD_SHADOW,
-        },
-    )
+            return empty_affected_zones()

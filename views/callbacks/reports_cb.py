@@ -399,30 +399,46 @@ def _register_pdf_download(app: object) -> None:
         Output("reports-pdf-download", "data"),
         Input("reports-confirm-download", "submit_n_clicks"),
         State("reports-period", "value"),
+        State("tenant-store", "data"),
         State("url", "pathname"),
         prevent_initial_call=True,
     )
     @safe_callback
     def download_report(
-        n_clicks: int | None, period: str, pathname: str | None
+        n_clicks: int | None,
+        period: str,
+        tenant: str | None,
+        pathname: str | None,
     ) -> dict | None:
+        """Download PDF report with tenant and date in filename.
+
+        Args:
+            n_clicks: Confirm dialog submit click count.
+            period: Report period ('today', '7d', '30d').
+            tenant: Active tenant identifier.
+            pathname: Current URL path.
+
+        Returns:
+            Download dict for dcc.Download or no_update.
+        """
         if pathname != "/reports" or not n_clicks:
             return no_update
 
         import base64
+        from datetime import datetime
 
-        period_label = {"today": "today", "7d": "7days", "30d": "30days"}.get(
-            period, "report"
-        )
+        tenant_slug = tenant or "horse_renault"
+        date_str = datetime.now().strftime("%Y%m%d")
 
         # Try real PDF first
         try:
             from utils.pdf_report import generate_report_pdf
 
             pdf_bytes = generate_report_pdf(period=period)
+            filename = f"plantaos_report_{tenant_slug}_{date_str}.pdf"
             return dict(
                 content=base64.b64encode(pdf_bytes).decode(),
-                filename=f"plantaos_report_{period_label}.pdf",
+                filename=filename,
                 type="application/pdf",
                 base64=True,
             )
@@ -434,7 +450,7 @@ def _register_pdf_download(app: object) -> None:
             from utils.pdf_report import generate_report_html
 
             html_content = generate_report_html(period=period)
-            filename = f"plantaos_report_{period_label}.html"
+            filename = f"plantaos_report_{tenant_slug}_{date_str}.html"
             return dict(content=html_content, filename=filename, type="text/html")
         except Exception as e:
             logger.warning(f"HTML report error: {e}")
@@ -444,9 +460,10 @@ def _register_pdf_download(app: object) -> None:
             from utils.pdf_report import generate_report_csv
 
             csv_content = generate_report_csv(period=period)
+            filename = f"plantaos_report_{tenant_slug}_{date_str}.csv"
             return dict(
                 content=csv_content,
-                filename="plantaos_report.csv",
+                filename=filename,
                 type="text/csv",
             )
         except Exception as e2:

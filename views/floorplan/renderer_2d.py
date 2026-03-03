@@ -48,6 +48,18 @@ _NAME_SHORT: dict[str, str] = {
     "Sala Pequena": "Sala Peq.",
 }
 
+# Team-color mapping: zone type → dot color for occupancy visualization
+_ZONE_TEAM_COLORS: dict[str, str] = {
+    "p0_informatica": "#5856D6",  # Engineering (purple)
+    "p1_dojo": STATUS_CRITICAL,  # Safety (red)
+    "p0_formacao1": STATUS_HEALTHY,  # Training (green)
+    "p0_formacao2": STATUS_HEALTHY,
+    "p0_formacao3": STATUS_HEALTHY,
+    "p0_reuniao": "#5856D6",  # Management (purple)
+    "p1_salagrande": "#5856D6",
+    "p1_salapequena": "#5856D6",
+}
+
 
 def render_floorplan_2d(
     floor: int = 0,
@@ -79,9 +91,11 @@ def render_floorplan_2d(
         if isinstance(zd, dict):
             score = zd.get("freedom_index", 50.0)
             occ = zd.get("occupant_count", 0)
+            bleed = zd.get("financial_bleed", 0) or zd.get("financial_bleed_eur_hr", 0)
         else:
             score = float(zd)
             occ = 0
+            bleed = 0
 
         color = zone_health_to_color(score)
         is_selected = zone_id == selected_zone
@@ -89,18 +103,21 @@ def render_floorplan_2d(
         # Zone shape
         shapes.append(_create_zone_shape(zone_id, polygon, color, is_selected))
 
-        # Zone label
+        # Zone label (with €/hr if available)
         zone_info = get_zone_by_id(zone_id)
         name = zone_info.name if zone_info else zone_id
         center = get_zone_center(zone_id)
-        fig.add_trace(_create_zone_label(zone_id, name, center, occ if occ else None))
+        fig.add_trace(
+            _create_zone_label(zone_id, name, center, occ if occ else None, bleed)
+        )
 
         # Hover trace (invisible marker with rich tooltip)
         fig.add_trace(_create_hover_trace(zone_id, center, zd, zone_info))
 
-        # Occupancy dots
+        # Occupancy dots (team-colored)
         if occ and occ > 0:
-            dots = _create_occupancy_dots(zone_id, polygon, occ)
+            dot_color = _ZONE_TEAM_COLORS.get(zone_id, ACCENT_BLUE)
+            dots = _create_occupancy_dots(zone_id, polygon, occ, dot_color)
             if dots is not None:
                 fig.add_trace(dots)
 
@@ -186,6 +203,7 @@ def _create_zone_label(
     name: str,
     center: tuple[float, float],
     value: float | None = None,
+    bleed_eur_hr: float = 0,
 ) -> go.Scatter:
     """Create a text label trace for a zone.
 
@@ -194,15 +212,21 @@ def _create_zone_label(
         name: Display name.
         center: (x, y) center point for the label.
         value: Optional metric value to display.
+        bleed_eur_hr: Financial bleed in €/hr to display below name.
 
     Returns:
         Plotly Scatter trace with text mode.
     """
     short_name = _NAME_SHORT.get(name, name)
+    parts = [f"<b>{short_name}</b>"]
     if value is not None:
-        text = f"<b>{short_name}</b><br>{int(value)}"
-    else:
-        text = f"<b>{short_name}</b>"
+        parts.append(str(int(value)))
+    if bleed_eur_hr and bleed_eur_hr > 0.01:
+        parts.append(
+            f"<span style='color:{STATUS_WARNING}'>€{bleed_eur_hr:.2f}/hr</span>"
+        )
+
+    text = "<br>".join(parts)
 
     return go.Scatter(
         x=[center[0]],
@@ -254,6 +278,11 @@ def _create_hover_trace(
         lines.append(f"Occupancy: {occ}/{cap}")
         lines.append(f"Energy: {energy:.2f} kWh")
         lines.append(f"Freedom Index: {freedom:.0f}/100")
+        bleed_val = zone_data.get("financial_bleed", 0) or zone_data.get(
+            "financial_bleed_eur_hr", 0
+        )
+        if bleed_val:
+            lines.append(f"Financial Bleed: €{bleed_val:.2f}/hr")
         hover_text = "<br>".join(lines)
     else:
         hover_text = f"<b>{name}</b><br>No data available"
@@ -274,6 +303,7 @@ def _create_occupancy_dots(
     zone_id: str,
     polygon: list[tuple[float, float]],
     count: int,
+    dot_color: str = ACCENT_BLUE,
 ) -> go.Scatter | None:
     """Generate occupancy dots inside a zone polygon.
 
@@ -281,6 +311,7 @@ def _create_occupancy_dots(
         zone_id: Zone identifier (used for stable RNG seed).
         polygon: Zone polygon vertices.
         count: Number of occupants.
+        dot_color: Color for the dots (team-based coloring).
 
     Returns:
         Plotly Scatter trace with dot markers, or None if no dots.
@@ -330,7 +361,7 @@ def _create_occupancy_dots(
         mode="markers",
         marker=dict(
             size=5,
-            color=ACCENT_BLUE,
+            color=dot_color,
             opacity=0.5,
         ),
         hoverinfo="skip",

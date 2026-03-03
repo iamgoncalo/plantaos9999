@@ -34,6 +34,11 @@ class ZoneState(BaseModel):
     total_energy_kwh: float = 0.0
     freedom_index: float = 0.0
     status: str = "unknown"
+    # AFI fields
+    perception: float = 0.0
+    distortion: float = 1.0
+    afi_freedom: float = 0.0
+    financial_bleed_eur_hr: float = 0.0
 
 
 class FloorState(BaseModel):
@@ -57,6 +62,10 @@ class BuildingState(BaseModel):
     total_energy_kwh: float = 0.0
     avg_freedom_index: float = 0.0
     active_alerts: int = 0
+    # AFI aggregate fields
+    afi_state: dict | None = None
+    total_financial_bleed_eur_hr: float = 0.0
+    avg_afi_freedom: float = 0.0
 
 
 def aggregate_zone_state(
@@ -228,6 +237,32 @@ def compute_building_state() -> BuildingState:
         f"freedom={avg_freedom:.1f}, alerts={active_alerts}"
     )
 
+    # Compute AFI state (guarded so existing code doesn't break)
+    afi_state_dict = None
+    total_bleed = 0.0
+    avg_afi_f = 0.0
+    try:
+        from core.afi_engine import compute_building_afi
+
+        afi = compute_building_afi()
+        afi_state_dict = afi.model_dump(mode="json")
+        total_bleed = afi.total_financial_bleed_eur_hr
+        avg_afi_f = afi.avg_freedom
+
+        # Enrich zone states with AFI data
+        for floor_state in floor_states:
+            for zone_state in floor_state.zones:
+                zone_afi = afi.zones.get(zone_state.zone_id)
+                if zone_afi:
+                    zone_state.perception = zone_afi.perception.P
+                    zone_state.distortion = zone_afi.distortion.D
+                    zone_state.afi_freedom = zone_afi.freedom.F
+                    zone_state.financial_bleed_eur_hr = (
+                        zone_afi.financial.total_bleed_eur_hr
+                    )
+    except Exception as e:
+        logger.debug(f"AFI computation skipped: {e}")
+
     state = BuildingState(
         timestamp=now,
         floors=floor_states,
@@ -235,6 +270,9 @@ def compute_building_state() -> BuildingState:
         total_energy_kwh=round(total_energy, 4),
         avg_freedom_index=round(avg_freedom, 1),
         active_alerts=active_alerts,
+        afi_state=afi_state_dict,
+        total_financial_bleed_eur_hr=round(total_bleed, 4),
+        avg_afi_freedom=round(avg_afi_f, 4),
     )
 
     _cached_state = state

@@ -62,6 +62,7 @@ def generate_3d_html(
     building_data: dict[str, dict[str, Any]] | None = None,
     metric: str = "freedom_index",
     visible_floors: str = "all",
+    afi_data: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     """Generate a complete HTML page with an embedded Three.js 3D building.
 
@@ -70,12 +71,14 @@ def generate_3d_html(
         metric: Which metric to color zones by
             ('freedom_index', 'temperature_c', 'occupant_count', 'total_energy_kwh').
         visible_floors: Which floors to show ('all', '0', '1').
+        afi_data: Optional dict mapping zone_id to financial overlay data
+            with keys: financial_bleed_eur_hr, freedom, perception, distortion.
 
     Returns:
         Self-contained HTML string for use as Iframe srcDoc.
     """
     building_data = building_data or {}
-    zone_js = _build_zone_meshes_js(building_data, metric, visible_floors)
+    zone_js = _build_zone_meshes_js(building_data, metric, visible_floors, afi_data)
 
     # Camera target at building center, vertically between both floors
     cam_target_x = FLOOR_WIDTH_M / 2
@@ -137,8 +140,23 @@ def generate_3d_html(
 </head>
 <body>
 <div id="tooltip"></div>
+<div id="mode-toggle" style="position:absolute;top:16px;left:16px;z-index:100;
+  background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);
+  border-radius:12px;padding:8px 16px;cursor:pointer;
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:500;
+  color:#1D1D1F;box-shadow:0 2px 12px rgba(0,0,0,0.1);
+  border:1px solid #E5E5EA;user-select:none;">
+  &#x1F3AE; First Person
+</div>
+<div id="fps-instructions" style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  z-index:100;display:none;background:rgba(0,0,0,0.7);color:#fff;
+  border-radius:12px;padding:12px 24px;font-family:'Inter',sans-serif;font-size:13px;
+  text-align:center;">
+  WASD to move &middot; Mouse to look &middot; ESC to exit
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
 <script>
 (function() {{
   "use strict";
@@ -174,6 +192,61 @@ def generate_3d_html(
   controls.maxPolarAngle = Math.PI / 2.2;
   controls.target.set({cam_target_x:.1f}, {cam_target_y:.1f}, {cam_target_z:.1f});
   controls.update();
+
+  // -- First Person Controls ---------------------------------
+  var fpControls = new THREE.PointerLockControls(camera, document.body);
+  var isFPS = false;
+  var moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+  var velocity = new THREE.Vector3();
+  var direction = new THREE.Vector3();
+  var prevTime = performance.now();
+  var modeBtn = document.getElementById("mode-toggle");
+  var fpsInstructions = document.getElementById("fps-instructions");
+
+  modeBtn.addEventListener("click", function() {{
+    if (!isFPS) {{
+      // Enter FPS mode
+      camera.position.set(5, 1.6, 7.5); // eye level floor 0
+      fpControls.lock();
+    }} else {{
+      // Exit FPS mode
+      fpControls.unlock();
+    }}
+  }});
+
+  fpControls.addEventListener("lock", function() {{
+    isFPS = true;
+    controls.enabled = false;
+    modeBtn.innerHTML = "&#x1F3AE; Exit First Person";
+    fpsInstructions.style.display = "block";
+  }});
+
+  fpControls.addEventListener("unlock", function() {{
+    isFPS = false;
+    controls.enabled = true;
+    modeBtn.innerHTML = "&#x1F3AE; First Person";
+    fpsInstructions.style.display = "none";
+    velocity.set(0, 0, 0);
+  }});
+
+  document.addEventListener("keydown", function(e) {{
+    if (!isFPS) return;
+    switch(e.code) {{
+      case "KeyW": case "ArrowUp": moveForward = true; break;
+      case "KeyS": case "ArrowDown": moveBackward = true; break;
+      case "KeyA": case "ArrowLeft": moveLeft = true; break;
+      case "KeyD": case "ArrowRight": moveRight = true; break;
+    }}
+  }});
+
+  document.addEventListener("keyup", function(e) {{
+    switch(e.code) {{
+      case "KeyW": case "ArrowUp": moveForward = false; break;
+      case "KeyS": case "ArrowDown": moveBackward = false; break;
+      case "KeyA": case "ArrowLeft": moveLeft = false; break;
+      case "KeyD": case "ArrowRight": moveRight = false; break;
+    }}
+  }});
 
   // -- Lighting --------------------------------------------
   var ambient = new THREE.AmbientLight(0xffffff, 0.55);
@@ -404,7 +477,27 @@ def generate_3d_html(
   // -- Animation loop --------------------------------------
   function animate() {{
     requestAnimationFrame(animate);
-    controls.update();
+    if (isFPS && fpControls.isLocked) {{
+      var time = performance.now();
+      var delta = (time - prevTime) / 1000;
+      velocity.x -= velocity.x * 8.0 * delta;
+      velocity.z -= velocity.z * 8.0 * delta;
+      direction.z = Number(moveForward) - Number(moveBackward);
+      direction.x = Number(moveRight) - Number(moveLeft);
+      direction.normalize();
+      if (moveForward || moveBackward) velocity.z -= direction.z * 25.0 * delta;
+      if (moveLeft || moveRight) velocity.x -= direction.x * 25.0 * delta;
+      fpControls.moveRight(-velocity.x * delta);
+      fpControls.moveForward(-velocity.z * delta);
+      // Clamp Y to eye level
+      camera.position.y = 1.6;
+      // Clamp to building bounds
+      camera.position.x = Math.max(0, Math.min(camera.position.x, 48.4));
+      camera.position.z = Math.max(0, Math.min(camera.position.z, 15));
+      prevTime = time;
+    }} else {{
+      controls.update();
+    }}
     renderer.render(scene, camera);
   }}
   animate();
@@ -426,6 +519,7 @@ def _build_zone_meshes_js(
     building_data: dict[str, dict[str, Any]],
     metric: str,
     visible_floors: str,
+    afi_data: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     """Generate JavaScript addZone() calls for all visible zones.
 
@@ -433,6 +527,8 @@ def _build_zone_meshes_js(
         building_data: Zone metric data keyed by zone_id.
         metric: Which metric to use for coloring.
         visible_floors: Which floors to render ('all', '0', '1').
+        afi_data: Optional dict mapping zone_id to financial overlay data
+            with keys: financial_bleed_eur_hr, freedom, perception, distortion.
 
     Returns:
         JavaScript code string with addZone() calls.
@@ -492,6 +588,47 @@ def _build_zone_meshes_js(
             f"{w:.2f}, {wall_h:.2f}, {d:.2f}, "
             f'"{color}", {metrics_json}, {opacity});'
         )
+
+        # Add financial overlay sprite if afi_data is provided for this zone
+        if afi_data and zone_id in afi_data:
+            zafi = afi_data[zone_id]
+            bleed = float(zafi.get("financial_bleed_eur_hr", 0.0))
+            freedom = float(zafi.get("freedom", 50.0))
+            # Color freedom value: green if high, red if low
+            if freedom >= 70:
+                freedom_color = STATUS_HEALTHY
+            elif freedom >= 40:
+                freedom_color = STATUS_WARNING
+            else:
+                freedom_color = STATUS_CRITICAL
+            sprite_y = y_base + wall_h + 1.5
+            lines.append(
+                f"  (function() {{\n"
+                f'    var canvas = document.createElement("canvas");\n'
+                f"    canvas.width = 256;\n"
+                f"    canvas.height = 96;\n"
+                f'    var ctx = canvas.getContext("2d");\n'
+                f'    ctx.fillStyle = "rgba(0,0,0,0.75)";\n'
+                f"    ctx.beginPath();\n"
+                f"    ctx.roundRect(4, 4, 248, 88, 10);\n"
+                f"    ctx.fill();\n"
+                f"    ctx.font = \"bold 20px 'JetBrains Mono', monospace\";\n"
+                f'    ctx.fillStyle = "#FFD60A";\n'
+                f'    ctx.textAlign = "center";\n'
+                f'    ctx.fillText("\\u20AC{bleed:.2f}/hr", 128, 40);\n'
+                f"    ctx.font = \"16px 'Inter', sans-serif\";\n"
+                f'    ctx.fillStyle = "{freedom_color}";\n'
+                f'    ctx.fillText("F: {freedom:.0f}", 128, 70);\n'
+                f"    var tex = new THREE.CanvasTexture(canvas);\n"
+                f"    tex.minFilter = THREE.LinearFilter;\n"
+                f"    var spriteMat = new THREE.SpriteMaterial({{ map: tex,"
+                f" transparent: true, depthTest: false }});\n"
+                f"    var sprite = new THREE.Sprite(spriteMat);\n"
+                f"    sprite.position.set({cx:.2f}, {sprite_y:.2f}, {cz:.2f});\n"
+                f"    sprite.scale.set(3, 1.125, 1);\n"
+                f"    scene.add(sprite);\n"
+                f"  }})();"
+            )
 
     return "\n".join(lines)
 

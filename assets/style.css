@@ -1308,3 +1308,124 @@ body {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* ═══════════════════════════════════════════════
+   Sidebar Submenu (View → 2D/3D/4D)
+   ═══════════════════════════════════════════════ */
+
+.sidebar-nav-item.has-submenu {
+    cursor: default;
+}
+
+.sidebar-submenu {
+    margin-top: 2px;
+    margin-bottom: 4px;
+}
+
+.sidebar-submenu .sidebar-nav-item {
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.sidebar-submenu a {
+    text-decoration: none;
+    color: inherit;
+}
+
+/* ═══════════════════════════════════════════════
+   Simulation Page
+   ═══════════════════════════════════════════════ */
+
+.sim-radio-group label {
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.sim-radio-group input[type="radio"] {
+    display: none;
+}
+
+.sim-radio-group input[type="radio"]:checked + label {
+    color: var(--accent-blue);
+    font-weight: 600;
+}
+
+.sim-trigger-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 113, 227, 0.3);
+}
+
+.sim-trigger-btn:active {
+    transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════════
+   Reports Page
+   ═══════════════════════════════════════════════ */
+
+.reports-period-selector {
+    display: inline-flex;
+    gap: 0;
+    background: var(--bg-card);
+    border-radius: 10px;
+    border: 1px solid var(--border-default);
+    padding: 3px;
+}
+
+/* ═══════════════════════════════════════════════
+   Deployment Page
+   ═══════════════════════════════════════════════ */
+
+.deploy-slider-row {
+    margin-bottom: 20px;
+}
+
+.deploy-slider-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    display: block;
+}
+
+.deploy-impact-card {
+    background: var(--bg-primary);
+    border-radius: var(--card-radius-sm);
+    padding: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.deploy-comparison {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+    justify-content: space-between;
+}
+
+.deploy-delta-positive {
+    color: var(--status-healthy);
+    font-weight: 600;
+}
+
+.deploy-delta-negative {
+    color: var(--status-critical);
+    font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════
+   Alert Pulse Animation (for warning/critical zones)
+   ═══════════════════════════════════════════════ */
+
+@keyframes zone-pulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.55; }
+}
+
+.zone-pulse-warning {
+    animation: zone-pulse 2s ease-in-out infinite;
+}
+
+.zone-pulse-critical {
+    animation: zone-pulse 1s ease-in-out infinite;
+}

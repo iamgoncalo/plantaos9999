@@ -12,9 +12,13 @@ from dash_iconify import DashIconify
 
 from views.callbacks.building_3d_cb import register_3d_callbacks
 from views.callbacks.comfort_cb import register_comfort_callbacks
+from views.callbacks.deployment_cb import register_deployment_callbacks
 from views.callbacks.energy_cb import register_energy_callbacks
 from views.callbacks.insights_cb import register_insights_callbacks
 from views.callbacks.occupancy_cb import register_occupancy_callbacks
+from views.callbacks.reports_cb import register_reports_callbacks
+from views.callbacks.simulation_cb import register_simulation_callbacks
+from views.callbacks.view_2d_cb import register_view_2d_callbacks
 
 
 # Page title mapping: pathname → display title
@@ -25,7 +29,12 @@ _PAGE_TITLES: dict[str, str] = {
     "/comfort": "Comfort",
     "/occupancy": "Occupancy",
     "/insights": "Insights",
-    "/building_3d": "3D View",
+    "/building_3d": "3D Building",
+    "/view_2d": "2D Map",
+    "/view_4d": "4D Simulation",
+    "/simulation": "Simulation",
+    "/reports": "Reports",
+    "/deployment": "Deployment",
 }
 
 
@@ -51,6 +60,11 @@ def register_callbacks(app: object) -> None:
     register_occupancy_callbacks(app)
     register_insights_callbacks(app)
     register_3d_callbacks(app)
+    # New AFI pages
+    register_simulation_callbacks(app)
+    register_reports_callbacks(app)
+    register_deployment_callbacks(app)
+    register_view_2d_callbacks(app)
 
 
 def _register_routing_callback(app: object) -> None:
@@ -65,10 +79,14 @@ def _register_routing_callback(app: object) -> None:
         """Route URL pathname to the correct page component."""
         from views.pages.building_3d import create_building_3d_page
         from views.pages.comfort import create_comfort_page
+        from views.pages.deployment import create_deployment_page
         from views.pages.energy import create_energy_page
         from views.pages.insights_page import create_insights_page
         from views.pages.occupancy import create_occupancy_page
         from views.pages.overview import create_overview_page
+        from views.pages.reports import create_reports_page
+        from views.pages.simulation import create_simulation_page
+        from views.pages.view_2d import create_view_2d_page
 
         page_map = {
             "/": create_overview_page,
@@ -78,6 +96,11 @@ def _register_routing_callback(app: object) -> None:
             "/occupancy": create_occupancy_page,
             "/insights": create_insights_page,
             "/building_3d": create_building_3d_page,
+            "/view_2d": create_view_2d_page,
+            "/view_4d": create_simulation_page,
+            "/simulation": create_simulation_page,
+            "/reports": create_reports_page,
+            "/deployment": create_deployment_page,
         }
 
         title = _PAGE_TITLES.get(pathname, "Not Found")
@@ -184,21 +207,22 @@ def _register_overview_kpi_callback(app: object) -> None:
         if not state_data:
             return [
                 create_kpi_card("Total Energy", "—", icon="mdi:flash"),
-                create_kpi_card("Avg Temperature", "—", icon="mdi:thermometer"),
+                create_kpi_card("Financial Bleed", "—", icon="mdi:currency-eur"),
                 create_kpi_card("Occupancy", "—", icon="mdi:account-group"),
                 create_kpi_card("Active Alerts", "—", icon="mdi:alert-circle-outline"),
-                create_kpi_card("Building Health", "—", icon="mdi:heart-pulse"),
+                create_kpi_card("AFI Freedom", "—", icon="mdi:shield-check-outline"),
             ]
 
         energy = state_data.get("total_energy_kwh", 0) or 0
         occupancy = state_data.get("total_occupancy", 0) or 0
-        freedom = state_data.get("avg_freedom_index", 0) or 0
         alerts = state_data.get("active_alerts", 0) or 0
 
-        # Compute avg temperature from floor states
-        floors = state_data.get("floors", [])
-        temps = [f["avg_temperature"] for f in floors if f.get("avg_temperature")]
-        avg_temp = sum(temps) / len(temps) if temps else 0
+        # AFI data from spatial kernel
+        total_bleed = state_data.get("total_financial_bleed_eur_hr", 0) or 0
+        afi_freedom = state_data.get("avg_afi_freedom", 0) or 0
+        # Fallback to legacy freedom index if AFI not computed
+        if afi_freedom == 0:
+            afi_freedom = state_data.get("avg_freedom_index", 0) or 0
 
         return [
             create_kpi_card(
@@ -207,10 +231,10 @@ def _register_overview_kpi_callback(app: object) -> None:
                 icon="mdi:flash",
             ),
             create_kpi_card(
-                "Avg Temperature",
-                f"{avg_temp:.1f}",
-                unit="°C",
-                icon="mdi:thermometer",
+                "Financial Bleed",
+                f"{total_bleed:.2f}" if total_bleed < 100 else f"{total_bleed:.0f}",
+                unit="€/hr",
+                icon="mdi:currency-eur",
             ),
             create_kpi_card(
                 "Occupancy",
@@ -224,10 +248,10 @@ def _register_overview_kpi_callback(app: object) -> None:
                 icon="mdi:alert-circle-outline",
             ),
             create_kpi_card(
-                "Building Health",
-                f"{freedom:.0f}",
+                "AFI Freedom",
+                f"{afi_freedom:.0f}",
                 unit="/100",
-                icon="mdi:heart-pulse",
+                icon="mdi:shield-check-outline",
             ),
         ]
 

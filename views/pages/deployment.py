@@ -1,0 +1,300 @@
+"""Deployment page: admin god-mode for AFI formula tuning and sensor deployment.
+
+Provides real-time sliders for adjusting AFI engine parameters (financial
+rates, distortion weights) and previews the impact on Freedom scores and
+financial bleed across all monitored zones.
+"""
+
+from __future__ import annotations
+
+from dash import dcc, html
+from dash_iconify import DashIconify
+
+from config.afi_config import DEFAULT_AFI_CONFIG
+from config.theme import (
+    ACCENT_BLUE,
+    BG_CARD,
+    CARD_RADIUS,
+    CARD_SHADOW,
+    FONT_STACK,
+    GAP_ELEMENT,
+    PADDING_CARD,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+    TEXT_TERTIARY,
+)
+
+
+def _slider_row(
+    label: str,
+    slider_id: str,
+    min_val: float,
+    max_val: float,
+    step: float,
+    value: float,
+    unit: str = "",
+) -> html.Div:
+    """Create a labeled slider row for formula tuning.
+
+    Args:
+        label: Display label for the slider.
+        slider_id: Dash component ID.
+        min_val: Minimum slider value.
+        max_val: Maximum slider value.
+        step: Slider step increment.
+        value: Default slider value.
+        unit: Optional unit suffix for display.
+
+    Returns:
+        html.Div containing label and slider.
+    """
+    display_label = f"{label} ({unit})" if unit else label
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.Span(
+                        display_label,
+                        style={
+                            "fontSize": "13px",
+                            "color": TEXT_SECONDARY,
+                            "fontWeight": 500,
+                        },
+                    ),
+                    html.Span(
+                        f"{value}",
+                        id=f"{slider_id}-display",
+                        style={
+                            "fontSize": "13px",
+                            "color": TEXT_TERTIARY,
+                            "fontFamily": "JetBrains Mono",
+                        },
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "marginBottom": "4px",
+                },
+            ),
+            dcc.Slider(
+                id=slider_id,
+                min=min_val,
+                max=max_val,
+                step=step,
+                value=value,
+                marks=None,
+                tooltip={"placement": "bottom", "always_visible": False},
+            ),
+        ],
+        style={"marginBottom": "16px"},
+    )
+
+
+def create_deployment_page() -> html.Div:
+    """Create the deployment and configuration admin page layout.
+
+    Returns:
+        Dash html.Div containing formula tuning sliders,
+        impact preview panel, and sensor deployment map.
+    """
+    cfg = DEFAULT_AFI_CONFIG
+
+    return html.Div(
+        [
+            # -- Header ----------------------------------------
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            DashIconify(
+                                icon="mdi:cog-outline",
+                                width=28,
+                                color=ACCENT_BLUE,
+                            ),
+                            html.H2(
+                                "Deployment",
+                                style={
+                                    "margin": 0,
+                                    "fontSize": "22px",
+                                    "fontWeight": 600,
+                                    "color": TEXT_PRIMARY,
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "10px",
+                        },
+                    ),
+                    html.P(
+                        "Tune AFI parameters and manage sensor deployment "
+                        "across building zones.",
+                        style={
+                            "margin": "6px 0 0",
+                            "color": TEXT_SECONDARY,
+                            "fontSize": "14px",
+                            "maxWidth": "640px",
+                        },
+                    ),
+                ],
+                style={"marginBottom": f"{GAP_ELEMENT}px"},
+            ),
+            # -- Hidden config store --------------------------
+            dcc.Store(id="deploy-afi-config-store"),
+            # -- Two-column layout -----------------------------
+            html.Div(
+                [
+                    # Left column: Formula Tuning
+                    html.Div(
+                        [
+                            html.H3(
+                                "Formula Tuning",
+                                style={
+                                    "fontSize": "16px",
+                                    "fontWeight": 600,
+                                    "color": TEXT_PRIMARY,
+                                    "marginBottom": "20px",
+                                    "marginTop": 0,
+                                },
+                            ),
+                            _slider_row(
+                                "Energy Cost",
+                                "deploy-cost-slider",
+                                0.05,
+                                0.30,
+                                0.01,
+                                cfg.cost_per_kwh,
+                                unit="\u20ac/kWh",
+                            ),
+                            _slider_row(
+                                "Average Hourly Wage",
+                                "deploy-wage-slider",
+                                8.0,
+                                25.0,
+                                0.5,
+                                cfg.avg_hourly_wage,
+                                unit="\u20ac/hr",
+                            ),
+                            _slider_row(
+                                "Temperature Weight",
+                                "deploy-w-temp",
+                                0.0,
+                                1.0,
+                                0.05,
+                                cfg.w_temperature,
+                            ),
+                            _slider_row(
+                                "CO2 Weight",
+                                "deploy-w-co2",
+                                0.0,
+                                1.0,
+                                0.05,
+                                cfg.w_co2,
+                            ),
+                            _slider_row(
+                                "Crowding Weight",
+                                "deploy-w-crowd",
+                                0.0,
+                                1.0,
+                                0.05,
+                                cfg.w_crowding,
+                            ),
+                            _slider_row(
+                                "Blocked Exit Weight",
+                                "deploy-w-exit",
+                                0.0,
+                                1.0,
+                                0.05,
+                                cfg.w_blocked_exit,
+                            ),
+                        ],
+                        className="card",
+                        style={
+                            "padding": f"{PADDING_CARD}px",
+                            "background": BG_CARD,
+                            "borderRadius": CARD_RADIUS,
+                            "boxShadow": CARD_SHADOW,
+                            "flex": 1,
+                            "minWidth": "320px",
+                        },
+                    ),
+                    # Right column: Impact Preview
+                    html.Div(
+                        [
+                            html.H3(
+                                "Impact Preview",
+                                style={
+                                    "fontSize": "16px",
+                                    "fontWeight": 600,
+                                    "color": TEXT_PRIMARY,
+                                    "marginBottom": "20px",
+                                    "marginTop": 0,
+                                },
+                            ),
+                            # Before/after comparison container
+                            html.Div(
+                                "Adjust parameters to preview the impact on "
+                                "Freedom and financial bleed.",
+                                id="deploy-impact-preview",
+                                style={
+                                    "fontSize": "13px",
+                                    "color": TEXT_SECONDARY,
+                                    "minHeight": "180px",
+                                },
+                            ),
+                            html.Hr(
+                                style={
+                                    "border": "none",
+                                    "borderTop": "1px solid #E5E5EA",
+                                    "margin": "16px 0",
+                                },
+                            ),
+                            # Sensor deployment floorplan
+                            html.Div(
+                                html.Span(
+                                    "Sensor deployment map will render here.",
+                                    style={
+                                        "fontSize": "13px",
+                                        "color": TEXT_TERTIARY,
+                                    },
+                                ),
+                                id="deploy-sensor-map",
+                                style={
+                                    "minHeight": "200px",
+                                    "display": "flex",
+                                    "alignItems": "center",
+                                    "justifyContent": "center",
+                                    "background": "#FAFAFA",
+                                    "borderRadius": "12px",
+                                },
+                            ),
+                        ],
+                        className="card",
+                        style={
+                            "padding": f"{PADDING_CARD}px",
+                            "background": BG_CARD,
+                            "borderRadius": CARD_RADIUS,
+                            "boxShadow": CARD_SHADOW,
+                            "flex": 1,
+                            "minWidth": "320px",
+                        },
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "gap": f"{GAP_ELEMENT}px",
+                    "alignItems": "flex-start",
+                    "flexWrap": "wrap",
+                },
+            ),
+        ],
+        className="page-enter",
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": f"{GAP_ELEMENT}px",
+            "fontFamily": FONT_STACK,
+        },
+    )

@@ -32,11 +32,18 @@ _SYSTEM_PROMPT = """You are PlantaOS, the intelligent operating system for the C
 Técnica HORSE/Renault in Aveiro, Portugal. You analyze building sensor data and \
 provide concise, actionable insights.
 
+You have access to the AFI (Architecture of Freedom Intelligence) framework:
+- Perception (P): sensor coverage quality — P = log2(N) * T where N=exits, T=sensor depth
+- Distortion (D): barriers to free movement — geometric model of temperature, CO2, crowding
+- Freedom (F = P/D): the spatial health index (higher is better)
+- Financial Bleed: €/hr cost of inefficiencies (energy waste + human capital loss)
+- Stigmergy: pheromone-based routing through zone adjacency graph
+
 Your role:
 - Explain anomalies in plain language (Portuguese or English based on context)
-- Identify root causes when possible
-- Suggest specific corrective actions
-- Reference zone names and building layout when relevant
+- Identify root causes when possible, citing specific €/hr costs
+- Suggest specific corrective actions with expected savings
+- Reference zone names, Freedom scores, and financial bleed when relevant
 - Keep insights concise (2-4 sentences)
 - Focus on what matters to facility managers
 
@@ -44,7 +51,8 @@ Building context:
 - 2-floor training center, ~1000m², max 454 occupants
 - Two shifts: morning (6h-14h), afternoon (14h-22h)
 - HVAC, lighting, comfort sensors across 20 monitored zones
-- March weather in Aveiro: 8-18°C, occasional rain"""
+- March weather in Aveiro: 8-18°C, occasional rain
+- 3 sensor tiers: Cheap IoT (T=1h), Matter Compliant (T=4h), AI Vision (T=8h)"""
 
 
 class Insight(BaseModel):
@@ -203,6 +211,13 @@ def answer_building_question(
         )
         ctx_parts.append(f"  Active alerts: {building_state.get('active_alerts', 0)}")
 
+        # AFI data
+        bleed = building_state.get("total_financial_bleed_eur_hr", 0)
+        afi_f = building_state.get("avg_afi_freedom", 0)
+        if bleed or afi_f:
+            ctx_parts.append(f"  AFI Freedom: {afi_f:.1f}")
+            ctx_parts.append(f"  Financial Bleed: €{bleed:.2f}/hr")
+
         for floor in building_state.get("floors", []):
             floor_num = floor.get("floor", "?")
             ctx_parts.append(
@@ -212,13 +227,16 @@ def answer_building_question(
                 f"{floor.get('total_energy_kwh', 0):.1f} kWh"
             )
             for z in floor.get("zones", []):
+                zone_info = get_zone_by_id(z["zone_id"])
+                name = zone_info.name if zone_info else z["zone_id"]
+                z_bleed = z.get("financial_bleed_eur_hr", 0)
+                z_freedom = z.get("afi_freedom", 0)
                 if z.get("status") in ("warning", "critical"):
-                    zone_info = get_zone_by_id(z["zone_id"])
-                    name = zone_info.name if zone_info else z["zone_id"]
                     ctx_parts.append(
                         f"    ⚠ {name}: {z.get('status')} — "
                         f"{z.get('temperature_c', '?')}°C, "
                         f"CO₂ {z.get('co2_ppm', '?')} ppm"
+                        f"{f', F={z_freedom:.1f}, €{z_bleed:.2f}/hr' if z_bleed else ''}"
                     )
 
     context_text = "\n".join(ctx_parts)

@@ -1,7 +1,6 @@
-"""Booking room-finder callbacks.
+"""Booking room-finder callback.
 
-Registers the callback that takes booking requirements (date, time,
-duration, people, equipment) and returns a ranked list of available rooms.
+Ranks rooms by comfort, energy, and capacity fit for a booking request.
 """
 
 from __future__ import annotations
@@ -33,11 +32,7 @@ from views.components.safe_callback import safe_callback
 
 
 def register_booking_finder_callbacks(app: object) -> None:
-    """Register room finder callbacks.
-
-    Args:
-        app: The Dash application instance.
-    """
+    """Register room finder callbacks."""
     _register_room_finder(app)
 
 
@@ -59,51 +54,30 @@ def _register_room_finder(app: object) -> None:
     )
     @safe_callback
     def find_rooms(
-        n_clicks: int | None,
-        selected_date: str | None,
-        start_hour: int | None,
-        duration: int | None,
-        people: int | None,
-        floor_pref: str | None,
-        requirements: list | None,
-        bookings: list | None,
-        pathname: str | None,
+        n_clicks,
+        selected_date,
+        start_hour,
+        duration,
+        people,
+        floor_pref,
+        requirements,
+        bookings,
+        pathname,
     ) -> list:
-        """Find and rank available rooms for the requested slot.
-
-        Args:
-            n_clicks: Find button click count.
-            selected_date: Selected date string.
-            start_hour: Start hour (6-22).
-            duration: Duration in hours.
-            people: Number of occupants.
-            floor_pref: Floor preference ("any", "0", "1").
-            requirements: Requirement values (projector, computers, quiet).
-            bookings: Current bookings list from store.
-            pathname: Current page URL.
-
-        Returns:
-            List of room card components ranked by suitability.
-        """
-        if pathname != "/booking":
+        """Find and rank available rooms for the requested slot."""
+        if pathname != "/booking" or not n_clicks:
             return no_update
-        if not n_clicks:
-            return no_update
-
-        duration = duration or 1
-        people = people or 15
+        duration, people = duration or 1, people or 15
         start_hour = start_hour or 9
-        requirements = requirements or []
-        bookings = bookings or []
-
+        requirements, bookings = requirements or [], bookings or []
         try:
-            booking_date = (
+            bdate = (
                 datetime.fromisoformat(str(selected_date)).date()
                 if selected_date
                 else date.today()
             )
         except (ValueError, TypeError):
-            booking_date = date.today()
+            bdate = date.today()
 
         candidates = []
         for zone in get_monitored_zones():
@@ -112,47 +86,35 @@ def _register_room_finder(app: object) -> None:
             if floor_pref and floor_pref != "any":
                 if zone.floor != int(floor_pref):
                     continue
-
-            if has_booking_conflict(
-                zone.id, booking_date, start_hour, duration, bookings
-            ):
+            if has_booking_conflict(zone.id, bdate, start_hour, duration, bookings):
                 continue
-
-            # Primary score from improved scoring
             primary = score_room(
-                zone_id=zone.id,
-                zone_capacity=zone.capacity,
-                zone_type=zone.zone_type.value,
-                requested_people=people,
-                needs_projector="projector" in requirements,
-                needs_computers="computers" in requirements,
-                needs_quiet="quiet" in requirements,
+                zone.id,
+                zone.capacity,
+                zone.zone_type.value,
+                people,
+                "projector" in requirements,
+                "computers" in requirements,
+                "quiet" in requirements,
             )
-
-            # Detailed metrics for display
             metrics = compute_room_metrics(
                 zone.area_m2, zone.capacity, people, duration
             )
-
-            # Add legacy requirement bonus
-            req_bonus = compute_requirement_bonus(zone.id, zone.capacity, requirements)
-            metrics["total"] = min(100, round(primary + req_bonus, 1))
-
+            bonus = compute_requirement_bonus(zone.id, zone.capacity, requirements)
+            metrics["total"] = min(100, round(primary + bonus, 1))
             candidates.append((metrics["total"], zone, metrics))
 
         candidates.sort(key=lambda x: x[0], reverse=True)
-
         if not candidates:
             return [_no_rooms_message()]
-
         return [
-            _build_room_card(zone, scores, rank == 0)
-            for rank, (_total, zone, scores) in enumerate(candidates[:8])
+            _build_room_card(z, s, i == 0)
+            for i, (_t, z, s) in enumerate(candidates[:8])
         ]
 
 
 def _no_rooms_message() -> html.Div:
-    """Return an empty-state message when no rooms match."""
+    """Return empty-state message when no rooms match."""
     return html.Div(
         [
             html.P(
@@ -176,28 +138,17 @@ def _no_rooms_message() -> html.Div:
     )
 
 
-def _build_room_card(
-    zone: object,
-    scores: dict,
-    is_best: bool,
-) -> html.Div:
-    """Build a styled room result card.
-
-    Args:
-        zone: Zone model object.
-        scores: Metrics dict from compute_room_metrics.
-        is_best: Whether this is the top-ranked room.
-
-    Returns:
-        Dash html.Div with room details and Book button.
-    """
+def _build_room_card(zone: object, scores: dict, is_best: bool) -> html.Div:
+    """Build a styled room result card."""
     floor_label = "Piso 0" if zone.floor == 0 else "Piso 1"
+    total = scores["total"]
     badge_color = (
         STATUS_HEALTHY
-        if scores["total"] >= 70
-        else (STATUS_WARNING if scores["total"] >= 50 else STATUS_CRITICAL)
+        if total >= 70
+        else STATUS_WARNING
+        if total >= 50
+        else STATUS_CRITICAL
     )
-
     reasons = []
     if scores["comfort_score"] >= 80:
         reasons.append("excellent comfort conditions")
@@ -207,15 +158,10 @@ def _build_room_card(
         reasons.append("low energy cost")
     if scores["capacity_fit"] >= 80:
         reasons.append("ideal capacity match")
-
     reason_text = (
-        f"Best match: {', '.join(reasons)}."
-        if reasons
-        else f"Score {scores['total']:.0f}/100."
+        f"Best match: {', '.join(reasons)}." if reasons else f"Score {total:.0f}/100."
     )
-
-    border_style = f"2px solid {ACCENT_BLUE}" if is_best else "1px solid #E5E5EA"
-
+    border = f"2px solid {ACCENT_BLUE}" if is_best else "1px solid #E5E5EA"
     return html.Div(
         [
             html.Div(
@@ -230,10 +176,7 @@ def _build_room_card(
                                     "color": TEXT_PRIMARY,
                                 },
                             ),
-                            html.Span(
-                                floor_label,
-                                className="status-badge",
-                            ),
+                            html.Span(floor_label, className="status-badge"),
                         ],
                         style={
                             "display": "flex",
@@ -243,7 +186,7 @@ def _build_room_card(
                         },
                     ),
                     html.Span(
-                        f"{scores['total']:.0f}",
+                        f"{total:.0f}",
                         style={
                             "fontSize": "20px",
                             "fontWeight": 600,
@@ -292,17 +235,12 @@ def _build_room_card(
                 [
                     html.Span(
                         reason_text,
-                        style={
-                            "fontSize": "12px",
-                            "color": TEXT_TERTIARY,
-                            "flex": "1",
-                        },
+                        style={"fontSize": "12px", "color": TEXT_TERTIARY, "flex": "1"},
                     ),
                     html.Button(
                         "Book",
                         id={"type": "book-room-btn", "index": zone.id},
                         n_clicks=0,
-                        className="btn-primary-sm",
                         style={
                             "padding": "6px 20px",
                             "background": ACCENT_BLUE,
@@ -330,6 +268,6 @@ def _build_room_card(
             "background": BG_CARD,
             "borderRadius": CARD_RADIUS,
             "boxShadow": CARD_SHADOW,
-            "border": border_style,
+            "border": border,
         },
     )

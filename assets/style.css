@@ -845,3 +845,104 @@ body {
     border-radius: 4px;
     transition: width 300ms ease, background 300ms ease;
 }
+
+/* ═══════════════════════════════════════════════
+   Detail Page Styles (Energy, Comfort, Occupancy)
+   ═══════════════════════════════════════════════ */
+
+/* ── Page Controls Row ─────────────────────── */
+.page-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+}
+
+/* ── Time Range Selector (RadioItems) ──────── */
+.time-range-selector {
+    display: inline-flex !important;
+    gap: 0 !important;
+    background: var(--bg-card);
+    border-radius: 10px;
+    border: 1px solid var(--border-default);
+    padding: 3px;
+}
+
+.time-range-selector label {
+    padding: 6px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+
+.time-range-selector label:hover {
+    background: var(--bg-hover);
+}
+
+.time-range-selector input[type="radio"] {
+    display: none;
+}
+
+.time-range-selector input[type="radio"]:checked + label {
+    background: var(--accent-blue);
+    color: white;
+}
+
+/* ── Zone Filter Dropdown ─────────────────── */
+.zone-filter {
+    min-width: 280px;
+    max-width: 500px;
+}
+
+.zone-filter .Select-control {
+    border-radius: var(--card-radius-sm) !important;
+    border-color: var(--border-default) !important;
+}
+
+/* ── Chart Grid (2×2 layout) ──────────────── */
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+}
+
+/* ── Chart Title ──────────────────────────── */
+.chart-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding-bottom: var(--space-xs);
+}
+
+/* ── Responsive Breakpoints ───────────────── */
+@media (max-width: 1400px) {
+    .grid-5 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 1200px) {
+    .chart-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .grid-5 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .overview-row-main {
+        flex-direction: column;
+    }
+
+    .overview-zone-section {
+        min-width: 0;
+    }
+}

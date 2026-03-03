@@ -7,7 +7,7 @@ and Portuguese public holiday markers.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
@@ -39,7 +39,6 @@ def generate_weather(
     timestamps = pd.date_range(start=start, periods=n, freq="15min")
 
     hours = (timestamps.hour + timestamps.minute / 60.0).to_numpy()
-    day_of_year = timestamps.dayofyear.to_numpy()
 
     # --- Day-to-day base temperature variation (random walk) ---
     daily_base = np.zeros(days)
@@ -105,14 +104,16 @@ def generate_weather(
     wind_kmh = np.clip(wind_base, 5.0, 40.0)
     wind_ms = wind_kmh / 3.6  # Convert to m/s
 
-    return pd.DataFrame({
-        "timestamp": timestamps,
-        "outdoor_temp_c": np.round(outdoor_temp, 1),
-        "outdoor_humidity_pct": np.round(outdoor_humidity, 1),
-        "solar_radiation_w_m2": np.round(solar, 0),
-        "wind_speed_ms": np.round(wind_ms, 1),
-        "is_raining": is_raining,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "outdoor_temp_c": np.round(outdoor_temp, 1),
+            "outdoor_humidity_pct": np.round(outdoor_humidity, 1),
+            "solar_radiation_w_m2": np.round(solar, 0),
+            "wind_speed_ms": np.round(wind_ms, 1),
+            "is_raining": is_raining,
+        }
+    )
 
 
 def generate_shift_schedule(
@@ -150,12 +151,14 @@ def generate_shift_schedule(
     is_business_hours = (hours >= 6) & (hours < 22)
     is_weekend = dow >= 5
 
-    return pd.DataFrame({
-        "timestamp": timestamps,
-        "shift": shift,
-        "is_business_hours": is_business_hours,
-        "is_weekend": is_weekend,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "shift": shift,
+            "is_business_hours": is_business_hours,
+            "is_weekend": is_weekend,
+        }
+    )
 
 
 def generate_holidays(year: int = 2026) -> list[date]:
@@ -169,16 +172,16 @@ def generate_holidays(year: int = 2026) -> list[date]:
     """
     # Fixed Portuguese public holidays
     holidays = [
-        date(year, 1, 1),   # Ano Novo
+        date(year, 1, 1),  # Ano Novo
         date(year, 4, 25),  # Dia da Liberdade
-        date(year, 5, 1),   # Dia do Trabalhador
+        date(year, 5, 1),  # Dia do Trabalhador
         date(year, 6, 10),  # Dia de Portugal
         date(year, 8, 15),  # Assunção de Nossa Senhora
         date(year, 10, 5),  # Implantação da República
         date(year, 11, 1),  # Todos os Santos
         date(year, 12, 1),  # Restauração da Independência
         date(year, 12, 8),  # Imaculada Conceição
-        date(year, 12, 25), # Natal
+        date(year, 12, 25),  # Natal
     ]
 
     # Easter-dependent holidays for 2026
@@ -189,9 +192,9 @@ def generate_holidays(year: int = 2026) -> list[date]:
         easter = _compute_easter(year)
 
     holidays.append(easter - timedelta(days=47))  # Carnaval (not official)
-    holidays.append(easter - timedelta(days=2))    # Sexta-feira Santa
-    holidays.append(easter)                        # Domingo de Páscoa
-    holidays.append(easter + timedelta(days=60))   # Corpo de Deus
+    holidays.append(easter - timedelta(days=2))  # Sexta-feira Santa
+    holidays.append(easter)  # Domingo de Páscoa
+    holidays.append(easter + timedelta(days=60))  # Corpo de Deus
 
     return sorted(holidays)
 

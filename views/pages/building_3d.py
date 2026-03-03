@@ -9,7 +9,7 @@ from __future__ import annotations
 from dash import html
 from dash_iconify import DashIconify
 
-from config.theme import ACCENT_BLUE, TEXT_TERTIARY
+from config.theme import TEXT_TERTIARY
 
 
 def create_building_3d_page() -> html.Div:

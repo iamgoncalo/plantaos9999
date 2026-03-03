@@ -28,9 +28,7 @@ def run_pipeline(days: int = 30, seed: int = 42) -> None:
         cleaned = ingest_dataframe(name, df)
         store.put(name, cleaned)
 
-    logger.info(
-        f"Pipeline complete. Stored datasets: {store.keys()}"
-    )
+    logger.info(f"Pipeline complete. Stored datasets: {store.keys()}")
 
 
 def ingest_dataframe(name: str, df: pd.DataFrame) -> pd.DataFrame:

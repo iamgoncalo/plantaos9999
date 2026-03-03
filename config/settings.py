@@ -18,18 +18,24 @@ class AppSettings(BaseSettings):
     # App server
     APP_HOST: str = Field(default="0.0.0.0", description="Bind address")
     APP_PORT: int = Field(default=8050, description="HTTP port for the Dash server")
-    DEBUG: bool = Field(default=True, description="Enable Dash debug mode with hot-reload")
+    DEBUG: bool = Field(
+        default=True, description="Enable Dash debug mode with hot-reload"
+    )
     LOG_LEVEL: str = Field(default="DEBUG", description="Logging level")
 
     # Data
     DATA_REFRESH_INTERVAL: int = Field(
         default=30, description="Dashboard auto-refresh interval in seconds"
     )
-    SYNTHETIC_DAYS: int = Field(default=30, description="Days of synthetic history to generate")
+    SYNTHETIC_DAYS: int = Field(
+        default=30, description="Days of synthetic history to generate"
+    )
     DATA_SEED: int = Field(default=42, description="Random seed for reproducible data")
 
     # AI Insights
-    ANTHROPIC_API_KEY: str = Field(default="", description="Anthropic API key for Claude insights")
+    ANTHROPIC_API_KEY: str = Field(
+        default="", description="Anthropic API key for Claude insights"
+    )
 
     model_config = {
         "env_file": ".env",

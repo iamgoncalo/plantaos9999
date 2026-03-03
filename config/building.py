@@ -37,10 +37,14 @@ class Zone(BaseModel):
     name: str = Field(description="Human-readable zone name")
     floor: int = Field(description="Floor number (0 = ground, 1 = first)")
     area_m2: float = Field(description="Zone area in square meters")
-    capacity: int = Field(default=0, description="Maximum occupancy (0 = not applicable)")
+    capacity: int = Field(
+        default=0, description="Maximum occupancy (0 = not applicable)"
+    )
     zone_type: ZoneType = Field(description="Functional classification")
     has_hvac: bool = Field(default=True, description="Whether zone has HVAC")
-    has_sensors: bool = Field(default=True, description="Whether zone has comfort sensors")
+    has_sensors: bool = Field(
+        default=True, description="Whether zone has comfort sensors"
+    )
 
 
 class Floor(BaseModel):
@@ -68,9 +72,7 @@ class Building(BaseModel):
     def model_post_init(self, __context: object) -> None:
         """Compute max occupancy from zone capacities if not provided."""
         if self.max_occupancy == 0:
-            self.max_occupancy = sum(
-                z.capacity for f in self.floors for z in f.zones
-            )
+            self.max_occupancy = sum(z.capacity for f in self.floors for z in f.zones)
 
     @property
     def all_zones(self) -> list[Zone]:

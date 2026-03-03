@@ -15,10 +15,10 @@ from config.theme import (
 
 # Health score color stops: (score_threshold, hex_color)
 _HEALTH_STOPS: list[tuple[float, str]] = [
-    (0.0, STATUS_CRITICAL),   # #FF3B30
-    (30.0, STATUS_WARNING),   # #FF9500
-    (60.0, "#FFD60A"),        # Apple yellow
-    (80.0, STATUS_HEALTHY),   # #34C759
+    (0.0, STATUS_CRITICAL),  # #FF3B30
+    (30.0, STATUS_WARNING),  # #FF9500
+    (60.0, "#FFD60A"),  # Apple yellow
+    (80.0, STATUS_HEALTHY),  # #34C759
     (100.0, STATUS_HEALTHY),  # #34C759
 ]
 

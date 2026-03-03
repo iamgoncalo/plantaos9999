@@ -79,9 +79,7 @@ class DataStore:
             self._data.clear()
             logger.debug("DataStore cleared")
 
-    def get_zone_data(
-        self, name: str, zone_id: str
-    ) -> pd.DataFrame | None:
+    def get_zone_data(self, name: str, zone_id: str) -> pd.DataFrame | None:
         """Retrieve data for a specific zone from a dataset.
 
         Args:

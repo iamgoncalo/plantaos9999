@@ -50,7 +50,9 @@ CARD_SHADOW_ELEVATED = "0 8px 32px rgba(0, 0, 0, 0.16)"
 # ── Typography ────────────────────────────────
 FONT_PRIMARY = "Inter"
 FONT_DATA = "JetBrains Mono"
-FONT_STACK = f"'{FONT_PRIMARY}', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+FONT_STACK = (
+    f"'{FONT_PRIMARY}', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+)
 FONT_DATA_STACK = f"'{FONT_DATA}', 'SF Mono', 'Fira Code', monospace"
 
 WEIGHT_REGULAR = 400

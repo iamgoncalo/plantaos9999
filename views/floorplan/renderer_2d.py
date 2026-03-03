@@ -22,7 +22,6 @@ from config.theme import (
     STATUS_HEALTHY,
     STATUS_WARNING,
     TEXT_PRIMARY,
-    TEXT_SECONDARY,
 )
 from utils.colors import hex_to_rgb, zone_health_to_color
 from views.floorplan.zones_geometry import (

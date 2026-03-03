@@ -61,7 +61,9 @@ def create_overview_page() -> html.Div:
     # Row 2 Left: Floor tabs + floorplan graph
     floor_tabs = html.Div(
         [
-            html.Button("Piso 0", id="floor-tab-0", className="floor-tab active", n_clicks=0),
+            html.Button(
+                "Piso 0", id="floor-tab-0", className="floor-tab active", n_clicks=0
+            ),
             html.Button("Piso 1", id="floor-tab-1", className="floor-tab", n_clicks=0),
         ],
         className="floor-tabs",

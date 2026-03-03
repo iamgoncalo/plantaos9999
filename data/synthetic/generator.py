@@ -7,7 +7,6 @@ Generates 30 days of history at configurable intervals.
 
 from __future__ import annotations
 
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -113,25 +112,39 @@ def generate_realtime_tick(
     # Weather tick
     outdoor_temp = 13.0 - 5.0 * np.cos(2 * np.pi * (hour - 5) / 24)
     outdoor_temp += rng.normal(0, 0.5)
-    weather_tick = pd.DataFrame({
-        "timestamp": [now],
-        "outdoor_temp_c": [round(outdoor_temp, 1)],
-        "outdoor_humidity_pct": [round(70 + rng.normal(0, 5), 1)],
-        "solar_radiation_w_m2": [round(max(0, 400 * np.sin(
-            np.pi * max(0, hour - 7) / 12
-        ) if 7 <= hour <= 19 else 0), 0)],
-        "wind_speed_ms": [round(4.0 + rng.normal(0, 1), 1)],
-        "is_raining": [bool(rng.random() < 0.15)],
-    })
+    weather_tick = pd.DataFrame(
+        {
+            "timestamp": [now],
+            "outdoor_temp_c": [round(outdoor_temp, 1)],
+            "outdoor_humidity_pct": [round(70 + rng.normal(0, 5), 1)],
+            "solar_radiation_w_m2": [
+                round(
+                    max(
+                        0,
+                        400 * np.sin(np.pi * max(0, hour - 7) / 12)
+                        if 7 <= hour <= 19
+                        else 0,
+                    ),
+                    0,
+                )
+            ],
+            "wind_speed_ms": [round(4.0 + rng.normal(0, 1), 1)],
+            "is_raining": [bool(rng.random() < 0.15)],
+        }
+    )
 
     # Schedule tick
-    shift = "morning" if 6 <= hour < 14 else ("afternoon" if 14 <= hour < 22 else "night")
-    schedule_tick = pd.DataFrame({
-        "timestamp": [now],
-        "shift": [shift],
-        "is_business_hours": [6 <= hour < 22],
-        "is_weekend": [is_weekend],
-    })
+    shift = (
+        "morning" if 6 <= hour < 14 else ("afternoon" if 14 <= hour < 22 else "night")
+    )
+    schedule_tick = pd.DataFrame(
+        {
+            "timestamp": [now],
+            "shift": [shift],
+            "is_business_hours": [6 <= hour < 22],
+            "is_weekend": [is_weekend],
+        }
+    )
 
     # Occupancy tick
     occ_records = []
@@ -142,13 +155,15 @@ def generate_realtime_tick(
         if not is_weekend and 6 <= hour < 22:
             base_ratio = rng.uniform(0.3, 0.7)
         count = int(round(base_ratio * z["capacity"]))
-        occ_records.append({
-            "timestamp": now,
-            "zone_id": z["id"],
-            "occupant_count": count,
-            "occupancy_ratio": round(count / max(z["capacity"], 1), 3),
-            "is_occupied": count > 0,
-        })
+        occ_records.append(
+            {
+                "timestamp": now,
+                "zone_id": z["id"],
+                "occupant_count": count,
+                "occupancy_ratio": round(count / max(z["capacity"], 1), 3),
+                "is_occupied": count > 0,
+            }
+        )
     occupancy_tick = pd.DataFrame(occ_records)
 
     # Energy tick
@@ -158,15 +173,17 @@ def generate_realtime_tick(
         base = area * 0.12 / 96  # ~0.12 kWh/m²/day average
         factor = 0.8 if 6 <= hour < 22 and not is_weekend else 0.1
         total = base * factor * (1 + rng.normal(0, 0.1))
-        energy_records.append({
-            "timestamp": now,
-            "zone_id": z["id"],
-            "hvac_kwh": round(total * 0.60, 4),
-            "lighting_kwh": round(total * 0.20, 4),
-            "equipment_kwh": round(total * 0.15, 4),
-            "other_kwh": round(total * 0.05, 4),
-            "total_kwh": round(total, 4),
-        })
+        energy_records.append(
+            {
+                "timestamp": now,
+                "zone_id": z["id"],
+                "hvac_kwh": round(total * 0.60, 4),
+                "lighting_kwh": round(total * 0.20, 4),
+                "equipment_kwh": round(total * 0.15, 4),
+                "other_kwh": round(total * 0.05, 4),
+                "total_kwh": round(total, 4),
+            }
+        )
     energy_tick = pd.DataFrame(energy_records)
 
     # Comfort tick
@@ -179,14 +196,16 @@ def generate_realtime_tick(
         humidity = 50 + occ_ratio * 8 + rng.normal(0, 2)
         co2 = 400 + occ_ratio * z.get("capacity", 10) * 40 * 0.5 + rng.normal(0, 15)
         lux = (400 if 7 <= hour < 21 else 10) + rng.normal(0, 20)
-        comfort_records.append({
-            "timestamp": now,
-            "zone_id": z["id"],
-            "temperature_c": round(float(np.clip(temp, 14, 32)), 1),
-            "humidity_pct": round(float(np.clip(humidity, 30, 85)), 1),
-            "co2_ppm": int(np.clip(co2, 350, 2000)),
-            "illuminance_lux": int(max(0, lux)),
-        })
+        comfort_records.append(
+            {
+                "timestamp": now,
+                "zone_id": z["id"],
+                "temperature_c": round(float(np.clip(temp, 14, 32)), 1),
+                "humidity_pct": round(float(np.clip(humidity, 30, 85)), 1),
+                "co2_ppm": int(np.clip(co2, 350, 2000)),
+                "illuminance_lux": int(max(0, lux)),
+            }
+        )
     comfort_tick = pd.DataFrame(comfort_records)
 
     return {
@@ -261,11 +280,13 @@ def _print_summary(datasets: dict[str, pd.DataFrame]) -> None:
         # Print numeric column stats
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         for col in numeric_cols:
-            print(f"  {col}: min={df[col].min():.2f}, "
-                  f"max={df[col].max():.2f}, "
-                  f"mean={df[col].mean():.2f}")
+            print(
+                f"  {col}: min={df[col].min():.2f}, "
+                f"max={df[col].max():.2f}, "
+                f"mean={df[col].mean():.2f}"
+            )
 
-        print(f"\n  Sample (5 rows):")
+        print("\n  Sample (5 rows):")
         print(df.head(5).to_string(index=False))
 
 
@@ -276,10 +297,7 @@ if __name__ == "__main__":
 
     # Building-level daily energy check
     energy = datasets["energy"]
-    daily_total = (
-        energy.groupby(energy["timestamp"].dt.date)["total_kwh"]
-        .sum()
-    )
+    daily_total = energy.groupby(energy["timestamp"].dt.date)["total_kwh"].sum()
     print(f"\n{'=' * 60}")
     print("  DAILY ENERGY TOTALS (kWh)")
     print(f"{'=' * 60}")
@@ -289,10 +307,7 @@ if __name__ == "__main__":
 
     # Building-level peak occupancy check
     occ = datasets["occupancy"]
-    building_occ = (
-        occ.groupby("timestamp")["occupant_count"]
-        .sum()
-    )
+    building_occ = occ.groupby("timestamp")["occupant_count"].sum()
     print(f"\n{'=' * 60}")
     print("  BUILDING OCCUPANCY")
     print(f"{'=' * 60}")

@@ -67,9 +67,7 @@ def generate_occupancy_data(
                 continue
 
             # Check for special events on this zone/day/time
-            event_ratio = _get_event_ratio(
-                event_schedule, zone_id, day_idx, h
-            )
+            event_ratio = _get_event_ratio(event_schedule, zone_id, day_idx, h)
             if event_ratio is not None:
                 ratios[i] = event_ratio
                 continue
@@ -88,13 +86,15 @@ def generate_occupancy_data(
         counts = np.clip(counts, 0, capacity)
         actual_ratios = counts / max(capacity, 1)
 
-        zone_df = pd.DataFrame({
-            "timestamp": timestamps,
-            "zone_id": zone_id,
-            "occupant_count": counts,
-            "occupancy_ratio": np.round(actual_ratios, 3),
-            "is_occupied": counts > 0,
-        })
+        zone_df = pd.DataFrame(
+            {
+                "timestamp": timestamps,
+                "zone_id": zone_id,
+                "occupant_count": counts,
+                "occupancy_ratio": np.round(actual_ratios, 3),
+                "is_occupied": counts > 0,
+            }
+        )
         all_records.append(zone_df)
 
     return pd.concat(all_records, ignore_index=True)
@@ -155,8 +155,9 @@ def _generate_event_schedule(
         elif zone_type == "meeting":
             # 3-5 meeting blocks per weekday
             for d in range(days):
-                dow = (pd.Timestamp.now().normalize()
-                       - pd.Timedelta(days=days - d)).dayofweek
+                dow = (
+                    pd.Timestamp.now().normalize() - pd.Timedelta(days=days - d)
+                ).dayofweek
                 if dow >= 5:
                     continue
                 n_meetings = rng.integers(2, 6)

@@ -42,7 +42,9 @@ def generate_energy_data(
 
     end = pd.Timestamp.now().normalize()
     start = end - pd.Timedelta(days=days)
-    timestamps = pd.date_range(start=start, periods=n_timestamps, freq=f"{interval_min}min")
+    timestamps = pd.date_range(
+        start=start, periods=n_timestamps, freq=f"{interval_min}min"
+    )
 
     hours = timestamps.hour + timestamps.minute / 60.0
     dow = timestamps.dayofweek
@@ -75,15 +77,15 @@ def generate_energy_data(
         occ_ratios = occ_lookup.get(zone_id, np.full(n_timestamps, 0.3))
 
         # Compute load factors vectorized
-        hvac_factors = np.array([
-            _hvac_load_factor(h, d, 3) for h, d in zip(hours, dow)
-        ])
-        lighting_factors = np.array([
-            _lighting_load_factor(h, d) for h, d in zip(hours, dow)
-        ])
-        equipment_factors = np.array([
-            _equipment_load_factor(h, d) for h, d in zip(hours, dow)
-        ])
+        hvac_factors = np.array(
+            [_hvac_load_factor(h, d, 3) for h, d in zip(hours, dow)]
+        )
+        lighting_factors = np.array(
+            [_lighting_load_factor(h, d) for h, d in zip(hours, dow)]
+        )
+        equipment_factors = np.array(
+            [_equipment_load_factor(h, d) for h, d in zip(hours, dow)]
+        )
 
         # Modulate HVAC by weather (heating demand)
         if has_hvac and outdoor_temps is not None:
@@ -102,7 +104,9 @@ def generate_energy_data(
             hvac_factors[:] = 0.0
 
         # Weekend reduction
-        weekend_mask = is_weekend.values if hasattr(is_weekend, 'values') else is_weekend
+        weekend_mask = (
+            is_weekend.values if hasattr(is_weekend, "values") else is_weekend
+        )
         hvac_factors[weekend_mask] *= 0.20
         lighting_factors[weekend_mask] *= 0.15
         equipment_factors[weekend_mask] *= 0.10
@@ -118,10 +122,10 @@ def generate_energy_data(
         other_kwh[weekend_mask] *= 0.30
 
         # Add realistic noise
-        hvac_kwh *= (1 + rng.normal(0, 0.05, n_timestamps))
-        lighting_kwh *= (1 + rng.normal(0, 0.03, n_timestamps))
-        equipment_kwh *= (1 + rng.normal(0, 0.04, n_timestamps))
-        other_kwh *= (1 + rng.normal(0, 0.02, n_timestamps))
+        hvac_kwh *= 1 + rng.normal(0, 0.05, n_timestamps)
+        lighting_kwh *= 1 + rng.normal(0, 0.03, n_timestamps)
+        equipment_kwh *= 1 + rng.normal(0, 0.04, n_timestamps)
+        other_kwh *= 1 + rng.normal(0, 0.02, n_timestamps)
 
         # Clip to non-negative
         hvac_kwh = np.clip(hvac_kwh, 0, None)
@@ -131,15 +135,17 @@ def generate_energy_data(
 
         total_kwh = hvac_kwh + lighting_kwh + equipment_kwh + other_kwh
 
-        zone_df = pd.DataFrame({
-            "timestamp": timestamps,
-            "zone_id": zone_id,
-            "hvac_kwh": np.round(hvac_kwh, 4),
-            "lighting_kwh": np.round(lighting_kwh, 4),
-            "equipment_kwh": np.round(equipment_kwh, 4),
-            "other_kwh": np.round(other_kwh, 4),
-            "total_kwh": np.round(total_kwh, 4),
-        })
+        zone_df = pd.DataFrame(
+            {
+                "timestamp": timestamps,
+                "zone_id": zone_id,
+                "hvac_kwh": np.round(hvac_kwh, 4),
+                "lighting_kwh": np.round(lighting_kwh, 4),
+                "equipment_kwh": np.round(equipment_kwh, 4),
+                "other_kwh": np.round(other_kwh, 4),
+                "total_kwh": np.round(total_kwh, 4),
+            }
+        )
         all_records.append(zone_df)
 
     result = pd.concat(all_records, ignore_index=True)
@@ -257,7 +263,9 @@ def _inject_energy_anomalies(
 
             # Pick a random day
             day_offset = rng.integers(0, days)
-            base_ts = pd.Timestamp.now().normalize() - pd.Timedelta(days=days - day_offset)
+            base_ts = pd.Timestamp.now().normalize() - pd.Timedelta(
+                days=days - day_offset
+            )
 
             zone_mask = result["zone_id"] == zone_id
 
@@ -266,14 +274,17 @@ def _inject_energy_anomalies(
                 start_ts = base_ts + pd.Timedelta(hours=22)
                 duration_h = rng.integers(6, 13)
                 end_ts = start_ts + pd.Timedelta(hours=int(duration_h))
-                time_mask = (
-                    (result["timestamp"] >= start_ts) &
-                    (result["timestamp"] < end_ts)
+                time_mask = (result["timestamp"] >= start_ts) & (
+                    result["timestamp"] < end_ts
                 )
                 mask = zone_mask & time_mask
                 if mask.sum() > 0:
                     limit = ENERGY_LIMITS.get(target_zone["zone_type"])
-                    peak = (limit.max_kwh_per_m2_day if limit else 0.10) * target_zone["area_m2"] / 96
+                    peak = (
+                        (limit.max_kwh_per_m2_day if limit else 0.10)
+                        * target_zone["area_m2"]
+                        / 96
+                    )
                     result.loc[mask, "hvac_kwh"] = peak * 0.60 * rng.uniform(0.8, 1.0)
 
             elif anomaly_type == "equip_spike":
@@ -282,9 +293,8 @@ def _inject_energy_anomalies(
                 duration_h = rng.integers(1, 4)
                 start_ts = base_ts + pd.Timedelta(hours=int(start_h))
                 end_ts = start_ts + pd.Timedelta(hours=int(duration_h))
-                time_mask = (
-                    (result["timestamp"] >= start_ts) &
-                    (result["timestamp"] < end_ts)
+                time_mask = (result["timestamp"] >= start_ts) & (
+                    result["timestamp"] < end_ts
                 )
                 mask = zone_mask & time_mask
                 if mask.sum() > 0:
@@ -295,20 +305,27 @@ def _inject_energy_anomalies(
                 # Full lighting during night
                 start_ts = base_ts + pd.Timedelta(hours=23)
                 end_ts = start_ts + pd.Timedelta(hours=rng.integers(3, 7))
-                time_mask = (
-                    (result["timestamp"] >= start_ts) &
-                    (result["timestamp"] < end_ts)
+                time_mask = (result["timestamp"] >= start_ts) & (
+                    result["timestamp"] < end_ts
                 )
                 mask = zone_mask & time_mask
                 if mask.sum() > 0:
                     limit = ENERGY_LIMITS.get(target_zone["zone_type"])
-                    peak = (limit.max_kwh_per_m2_day if limit else 0.10) * target_zone["area_m2"] / 96
-                    result.loc[mask, "lighting_kwh"] = peak * 0.20 * rng.uniform(0.7, 1.0)
+                    peak = (
+                        (limit.max_kwh_per_m2_day if limit else 0.10)
+                        * target_zone["area_m2"]
+                        / 96
+                    )
+                    result.loc[mask, "lighting_kwh"] = (
+                        peak * 0.20 * rng.uniform(0.7, 1.0)
+                    )
 
     # Recompute total
     result["total_kwh"] = (
-        result["hvac_kwh"] + result["lighting_kwh"] +
-        result["equipment_kwh"] + result["other_kwh"]
+        result["hvac_kwh"]
+        + result["lighting_kwh"]
+        + result["equipment_kwh"]
+        + result["other_kwh"]
     )
     result["total_kwh"] = result["total_kwh"].round(4)
 

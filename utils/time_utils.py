@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 
 
 # Shift boundaries (24h format, Portuguese factory schedule)
-SHIFT_MORNING = (6, 14)   # 06:00 - 14:00
+SHIFT_MORNING = (6, 14)  # 06:00 - 14:00
 SHIFT_AFTERNOON = (14, 22)  # 14:00 - 22:00
 LUNCH_BREAK = (12, 13)  # 12:00 - 13:00
 

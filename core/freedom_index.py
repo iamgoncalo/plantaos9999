@@ -15,9 +15,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from loguru import logger
 
-from config.building import CFT_BUILDING, get_monitored_zones, get_zone_by_id
+from config.building import get_monitored_zones, get_zone_by_id
 from config.thresholds import COMFORT_BANDS, ENERGY_LIMITS
 from data.store import store
 
@@ -96,7 +95,9 @@ def _comfort_score(zone_id: str) -> float:
         temp = comfort_df["temperature_c"]
         band = COMFORT_BANDS.get("temperature")
         if band:
-            in_optimal = ((temp >= band.min_optimal) & (temp <= band.max_optimal)).mean()
+            in_optimal = (
+                (temp >= band.min_optimal) & (temp <= band.max_optimal)
+            ).mean()
             metrics_in_band.append(in_optimal)
 
     # Humidity: optimal 40-60%
@@ -212,7 +213,9 @@ def _occupancy_score(zone_id: str) -> float:
         hours = pd.to_datetime(occ_df["timestamp"]).dt.hour
         business = (hours >= 6) & (hours < 22)
         business_ratios = ratios[business]
-        underuse_pct = (business_ratios < 0.10).mean() if len(business_ratios) > 0 else 0
+        underuse_pct = (
+            (business_ratios < 0.10).mean() if len(business_ratios) > 0 else 0
+        )
     else:
         underuse_pct = 0
 

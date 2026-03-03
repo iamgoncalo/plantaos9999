@@ -13,7 +13,7 @@ import pandas as pd
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from config.building import CFT_BUILDING, get_monitored_zones, get_zones_by_floor
+from config.building import get_zones_by_floor
 from config.thresholds import evaluate_comfort
 from core.freedom_index import compute_zone_freedom
 from data.store import store
@@ -81,10 +81,26 @@ def aggregate_zone_state(
 
     if comfort_df is not None and not comfort_df.empty:
         latest_comfort = comfort_df.sort_values("timestamp").iloc[-1]
-        temp_c = float(latest_comfort.get("temperature_c", 0)) if pd.notna(latest_comfort.get("temperature_c")) else None
-        hum_pct = float(latest_comfort.get("humidity_pct", 0)) if pd.notna(latest_comfort.get("humidity_pct")) else None
-        co2 = float(latest_comfort.get("co2_ppm", 0)) if pd.notna(latest_comfort.get("co2_ppm")) else None
-        lux = float(latest_comfort.get("illuminance_lux", 0)) if pd.notna(latest_comfort.get("illuminance_lux")) else None
+        temp_c = (
+            float(latest_comfort.get("temperature_c", 0))
+            if pd.notna(latest_comfort.get("temperature_c"))
+            else None
+        )
+        hum_pct = (
+            float(latest_comfort.get("humidity_pct", 0))
+            if pd.notna(latest_comfort.get("humidity_pct"))
+            else None
+        )
+        co2 = (
+            float(latest_comfort.get("co2_ppm", 0))
+            if pd.notna(latest_comfort.get("co2_ppm"))
+            else None
+        )
+        lux = (
+            float(latest_comfort.get("illuminance_lux", 0))
+            if pd.notna(latest_comfort.get("illuminance_lux"))
+            else None
+        )
 
     # Get latest occupancy
     occ_df = store.get_zone_data("occupancy", zone_id)
@@ -234,6 +250,12 @@ def _classify_zone_status(
         return "unknown"
 
     # Return worst status
-    severity_order = {"critical": 3, "warning": 2, "acceptable": 1, "optimal": 0, "unknown": -1}
+    severity_order = {
+        "critical": 3,
+        "warning": 2,
+        "acceptable": 1,
+        "optimal": 0,
+        "unknown": -1,
+    }
     worst = max(statuses, key=lambda s: severity_order.get(s, -1))
     return worst

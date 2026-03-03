@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 # Comfort Band Models
 # ═══════════════════════════════════════════════
 
+
 class ComfortRange(BaseModel):
     """Defines acceptable range for a comfort metric."""
 
@@ -30,8 +31,12 @@ class EnergyLimit(BaseModel):
 
     zone_type: str = Field(description="Zone type this applies to")
     max_kwh_per_m2_day: float = Field(description="Maximum daily kWh per m²")
-    warning_factor: float = Field(default=0.8, description="Warning at this fraction of max")
-    critical_factor: float = Field(default=1.2, description="Critical at this multiple of max")
+    warning_factor: float = Field(
+        default=0.8, description="Warning at this fraction of max"
+    )
+    critical_factor: float = Field(
+        default=1.2, description="Critical at this multiple of max"
+    )
 
 
 class SafetyRule(BaseModel):
@@ -42,7 +47,9 @@ class SafetyRule(BaseModel):
     metric: str = Field(description="Metric being monitored")
     threshold: float = Field(description="Trigger value")
     comparison: str = Field(description="Operator: 'gt', 'lt', 'gte', 'lte'")
-    severity: str = Field(description="Alert severity: 'warning', 'critical', 'emergency'")
+    severity: str = Field(
+        description="Alert severity: 'warning', 'critical', 'emergency'"
+    )
 
 
 # ═══════════════════════════════════════════════
@@ -243,6 +250,7 @@ SAFETY_RULES: list[SafetyRule] = [
 # ═══════════════════════════════════════════════
 # Helper Functions
 # ═══════════════════════════════════════════════
+
 
 def get_comfort_band(metric: str) -> ComfortRange | None:
     """Look up comfort band by metric name.

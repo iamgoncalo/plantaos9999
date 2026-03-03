@@ -40,7 +40,9 @@ def generate_comfort_data(
 
     end = pd.Timestamp.now().normalize()
     start = end - pd.Timedelta(days=days)
-    timestamps = pd.date_range(start=start, periods=n_timestamps, freq=f"{interval_min}min")
+    timestamps = pd.date_range(
+        start=start, periods=n_timestamps, freq=f"{interval_min}min"
+    )
 
     hours = timestamps.hour + timestamps.minute / 60.0
     dow = timestamps.dayofweek
@@ -81,15 +83,15 @@ def generate_comfort_data(
             if h < 6 or h >= 22 or is_weekend[i]:
                 # Partial drift toward outdoor (building thermal mass)
                 drift_factor = 0.3 if is_weekend[i] and 8 <= h < 18 else 0.5
-                temp[i] = temp[i] * (1 - drift_factor) + outdoor_temp_arr[i] * drift_factor
+                temp[i] = (
+                    temp[i] * (1 - drift_factor) + outdoor_temp_arr[i] * drift_factor
+                )
         temp += rng.normal(0, 0.3, n_timestamps)
 
         # --- Humidity ---
         humidity = np.zeros(n_timestamps)
         for i in range(n_timestamps):
-            humidity[i] = _humidity_profile(
-                hours[i], occ_ratios[i], outdoor_hum_arr[i]
-            )
+            humidity[i] = _humidity_profile(hours[i], occ_ratios[i], outdoor_hum_arr[i])
         humidity[is_raining_arr] += rng.uniform(3, 8, is_raining_arr.sum())
         humidity += rng.normal(0, 2.0, n_timestamps)
         humidity = np.clip(humidity, 30, 80)
@@ -113,20 +115,24 @@ def generate_comfort_data(
         lux += rng.normal(0, 15, n_timestamps)
         lux = np.clip(lux, 0, 1200)
 
-        zone_df = pd.DataFrame({
-            "timestamp": timestamps,
-            "zone_id": zone_id,
-            "temperature_c": np.round(temp, 1),
-            "humidity_pct": np.round(humidity, 1),
-            "co2_ppm": np.round(co2, 0).astype(int),
-            "illuminance_lux": np.round(lux, 0).astype(int),
-        })
+        zone_df = pd.DataFrame(
+            {
+                "timestamp": timestamps,
+                "zone_id": zone_id,
+                "temperature_c": np.round(temp, 1),
+                "humidity_pct": np.round(humidity, 1),
+                "co2_ppm": np.round(co2, 0).astype(int),
+                "illuminance_lux": np.round(lux, 0).astype(int),
+            }
+        )
         all_records.append(zone_df)
 
     result = pd.concat(all_records, ignore_index=True)
 
     # Inject comfort anomalies
-    result = _inject_comfort_anomalies(result, sensor_zones, days, rng, outdoor_temp_arr)
+    result = _inject_comfort_anomalies(
+        result, sensor_zones, days, rng, outdoor_temp_arr
+    )
 
     return result
 
@@ -154,9 +160,20 @@ def _build_weather_arrays(
         return temp, hum, rain
 
     weather_indexed = weather_df.set_index("timestamp")
-    temp = weather_indexed["outdoor_temp_c"].reindex(timestamps, method="nearest").values
-    hum = weather_indexed["outdoor_humidity_pct"].reindex(timestamps, method="nearest").values
-    rain = weather_indexed["is_raining"].reindex(timestamps, method="nearest").fillna(False).values
+    temp = (
+        weather_indexed["outdoor_temp_c"].reindex(timestamps, method="nearest").values
+    )
+    hum = (
+        weather_indexed["outdoor_humidity_pct"]
+        .reindex(timestamps, method="nearest")
+        .values
+    )
+    rain = (
+        weather_indexed["is_raining"]
+        .reindex(timestamps, method="nearest")
+        .fillna(False)
+        .values
+    )
     return temp, hum, rain.astype(bool)
 
 
@@ -218,7 +235,9 @@ def _inject_comfort_anomalies(
             zone_id = target["id"]
 
             day_offset = rng.integers(0, days)
-            base_ts = pd.Timestamp.now().normalize() - pd.Timedelta(days=days - day_offset)
+            base_ts = pd.Timestamp.now().normalize() - pd.Timedelta(
+                days=days - day_offset
+            )
 
             zone_mask = result["zone_id"] == zone_id
 
@@ -228,21 +247,30 @@ def _inject_comfort_anomalies(
                 duration_h = rng.integers(2, 7)
                 start_ts = base_ts + pd.Timedelta(hours=int(start_h))
                 end_ts = start_ts + pd.Timedelta(hours=int(duration_h))
-                time_mask = (
-                    (result["timestamp"] >= start_ts) &
-                    (result["timestamp"] < end_ts)
+                time_mask = (result["timestamp"] >= start_ts) & (
+                    result["timestamp"] < end_ts
                 )
                 mask = zone_mask & time_mask
                 affected = mask.sum()
                 if affected > 0:
                     # Temperature drifts toward outdoor
                     drift = np.linspace(0, 1, affected)
-                    outdoor_avg = np.mean(outdoor_temps[
-                        day_offset * intervals_per_day:
-                        min((day_offset + 1) * intervals_per_day, len(outdoor_temps))
-                    ]) if day_offset * intervals_per_day < len(outdoor_temps) else 12.0
+                    outdoor_avg = (
+                        np.mean(
+                            outdoor_temps[
+                                day_offset * intervals_per_day : min(
+                                    (day_offset + 1) * intervals_per_day,
+                                    len(outdoor_temps),
+                                )
+                            ]
+                        )
+                        if day_offset * intervals_per_day < len(outdoor_temps)
+                        else 12.0
+                    )
                     current_temps = result.loc[mask, "temperature_c"].values
-                    drifted = current_temps * (1 - drift * 0.6) + outdoor_avg * drift * 0.6
+                    drifted = (
+                        current_temps * (1 - drift * 0.6) + outdoor_avg * drift * 0.6
+                    )
                     result.loc[mask, "temperature_c"] = np.round(drifted, 1)
 
             else:  # window_open
@@ -251,20 +279,23 @@ def _inject_comfort_anomalies(
                 duration_h = rng.integers(1, 4)
                 start_ts = base_ts + pd.Timedelta(hours=int(start_h))
                 end_ts = start_ts + pd.Timedelta(hours=int(duration_h))
-                time_mask = (
-                    (result["timestamp"] >= start_ts) &
-                    (result["timestamp"] < end_ts)
+                time_mask = (result["timestamp"] >= start_ts) & (
+                    result["timestamp"] < end_ts
                 )
                 mask = zone_mask & time_mask
                 affected = mask.sum()
                 if affected > 0:
                     result.loc[mask, "humidity_pct"] += rng.uniform(15, 25)
-                    result.loc[mask, "humidity_pct"] = result.loc[
-                        mask, "humidity_pct"
-                    ].clip(30, 95).round(1)
+                    result.loc[mask, "humidity_pct"] = (
+                        result.loc[mask, "humidity_pct"].clip(30, 95).round(1)
+                    )
                     # CO2 drops toward outdoor level
-                    co2_vals = result.loc[mask, "co2_ppm"].values * rng.uniform(0.5, 0.7)
-                    result.loc[mask, "co2_ppm"] = np.clip(co2_vals, 350, 2000).astype(int)
+                    co2_vals = result.loc[mask, "co2_ppm"].values * rng.uniform(
+                        0.5, 0.7
+                    )
+                    result.loc[mask, "co2_ppm"] = np.clip(co2_vals, 350, 2000).astype(
+                        int
+                    )
                     # Temp drifts toward outdoor
                     result.loc[mask, "temperature_c"] += rng.uniform(-3, -1)
 

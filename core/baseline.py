@@ -68,15 +68,25 @@ def compute_rolling_baseline(
     """
     if series.empty:
         return BaselineResult(
-            zone_id="unknown", metric="unknown",
-            mean=0, std=0, p25=0, p75=0, window_days=window,
+            zone_id="unknown",
+            metric="unknown",
+            mean=0,
+            std=0,
+            p25=0,
+            p75=0,
+            window_days=window,
         )
 
     values = series.dropna()
     if values.empty:
         return BaselineResult(
-            zone_id="unknown", metric="unknown",
-            mean=0, std=0, p25=0, p75=0, window_days=window,
+            zone_id="unknown",
+            metric="unknown",
+            mean=0,
+            std=0,
+            p25=0,
+            p75=0,
+            window_days=window,
         )
 
     mean_val = float(values.mean())
@@ -96,7 +106,9 @@ def compute_rolling_baseline(
     confidence = min(1.0, n / (window * 96))  # 96 intervals/day at 15-min
 
     return BaselineResult(
-        zone_id=series.name if hasattr(series, "name") and isinstance(series.name, str) else "unknown",
+        zone_id=series.name
+        if hasattr(series, "name") and isinstance(series.name, str)
+        else "unknown",
         metric="unknown",
         mean=round(mean_val, 4),
         std=round(std_val, 4),
@@ -133,8 +145,13 @@ def get_baseline_for_zone(
     if mapping is None:
         logger.warning(f"Unknown metric '{metric}' for baseline")
         return BaselineResult(
-            zone_id=zone_id, metric=metric,
-            mean=0, std=0, p25=0, p75=0, window_days=window_days,
+            zone_id=zone_id,
+            metric=metric,
+            mean=0,
+            std=0,
+            p25=0,
+            p75=0,
+            window_days=window_days,
         )
 
     dataset_name, column_name = mapping
@@ -143,15 +160,25 @@ def get_baseline_for_zone(
     if zone_df is None or zone_df.empty:
         logger.debug(f"No data for zone '{zone_id}' in '{dataset_name}'")
         return BaselineResult(
-            zone_id=zone_id, metric=metric,
-            mean=0, std=0, p25=0, p75=0, window_days=window_days,
+            zone_id=zone_id,
+            metric=metric,
+            mean=0,
+            std=0,
+            p25=0,
+            p75=0,
+            window_days=window_days,
         )
 
     if column_name not in zone_df.columns:
         logger.warning(f"Column '{column_name}' not in '{dataset_name}'")
         return BaselineResult(
-            zone_id=zone_id, metric=metric,
-            mean=0, std=0, p25=0, p75=0, window_days=window_days,
+            zone_id=zone_id,
+            metric=metric,
+            mean=0,
+            std=0,
+            p25=0,
+            p75=0,
+            window_days=window_days,
         )
 
     # Filter to window
@@ -195,9 +222,11 @@ def compute_time_of_day_baseline(
     else:
         return pd.DataFrame(columns=["hour", "day_of_week", "mean", "std"])
 
-    grouped = data.groupby(["hour", "day_of_week"])[value_column].agg(
-        ["mean", "std"]
-    ).reset_index()
+    grouped = (
+        data.groupby(["hour", "day_of_week"])[value_column]
+        .agg(["mean", "std"])
+        .reset_index()
+    )
     grouped["std"] = grouped["std"].fillna(0)
 
     return grouped

@@ -104,13 +104,9 @@ def _create_alert_item(alert: dict) -> html.Div:
 
     meta_children: list = []
     if alert.get("timestamp"):
-        meta_children.append(
-            html.Span(str(alert["timestamp"]))
-        )
+        meta_children.append(html.Span(str(alert["timestamp"])))
     if alert.get("zone_id"):
-        meta_children.append(
-            html.Span(alert["zone_id"], className="alert-item-zone")
-        )
+        meta_children.append(html.Span(alert["zone_id"], className="alert-item-zone"))
 
     meta = html.Div(meta_children, className="alert-item-meta")
 

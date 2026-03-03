@@ -8,7 +8,7 @@ Falls back to template-based insights if the API is unavailable.
 from __future__ import annotations
 
 import time
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
 from loguru import logger
@@ -88,9 +88,9 @@ def generate_daily_summary(target_date: date | None = None) -> str:
     summary_parts = [f"Daily Summary — {target_date.strftime('%d %B %Y')}"]
 
     if energy_df is not None and not energy_df.empty:
-        day_energy = energy_df[
-            energy_df["timestamp"].dt.date == target_date
-        ]["total_kwh"].sum()
+        day_energy = energy_df[energy_df["timestamp"].dt.date == target_date][
+            "total_kwh"
+        ].sum()
         summary_parts.append(f"Total energy consumption: {day_energy:.1f} kWh")
 
     if occ_df is not None and not occ_df.empty:
@@ -156,9 +156,7 @@ def generate_zone_analysis(zone_id: str) -> str:
 
     energy_df = store.get_zone_data("energy", zone_id)
     if energy_df is not None and not energy_df.empty:
-        daily_kwh = energy_df.groupby(
-            energy_df["timestamp"].dt.date
-        )["total_kwh"].sum()
+        daily_kwh = energy_df.groupby(energy_df["timestamp"].dt.date)["total_kwh"].sum()
         if not daily_kwh.empty:
             parts.append(
                 f"Energy: {daily_kwh.mean():.2f} kWh/day avg, "
@@ -174,7 +172,7 @@ def generate_zone_analysis(zone_id: str) -> str:
 
     # Try API
     prompt = (
-        f"Analyze this zone data and provide 2-3 actionable insights:\n\n"
+        "Analyze this zone data and provide 2-3 actionable insights:\n\n"
         + "\n".join(parts)
     )
 

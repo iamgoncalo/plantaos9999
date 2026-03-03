@@ -58,11 +58,13 @@ def detect_zscore_anomalies(
     std = values.std()
     zscores = (values - mean) / std
 
-    result = pd.DataFrame({
-        "value": values,
-        "zscore": zscores,
-        "is_anomaly": np.abs(zscores) > threshold,
-    })
+    result = pd.DataFrame(
+        {
+            "value": values,
+            "zscore": zscores,
+            "is_anomaly": np.abs(zscores) > threshold,
+        }
+    )
 
     return result
 
@@ -154,22 +156,28 @@ def get_anomalies(
         anomaly_rows = zscore_results[zscore_results["is_anomaly"]]
 
         for idx in anomaly_rows.index:
-            ts = zone_df.loc[idx, "timestamp"] if "timestamp" in zone_df.columns else "unknown"
+            ts = (
+                zone_df.loc[idx, "timestamp"]
+                if "timestamp" in zone_df.columns
+                else "unknown"
+            )
             val = float(anomaly_rows.loc[idx, "value"])
             zscore = float(anomaly_rows.loc[idx, "zscore"])
             severity = classify_severity(abs(zscore))
 
-            anomalies.append(Anomaly(
-                zone_id=zone_id,
-                metric=metric,
-                timestamp=str(ts),
-                value=round(val, 2),
-                expected=round(expected, 2),
-                deviation=round(zscore, 2),
-                severity=severity,
-                method="zscore",
-                description=f"{metric} at {val:.1f} is {abs(zscore):.1f}σ from baseline {expected:.1f}",
-            ))
+            anomalies.append(
+                Anomaly(
+                    zone_id=zone_id,
+                    metric=metric,
+                    timestamp=str(ts),
+                    value=round(val, 2),
+                    expected=round(expected, 2),
+                    deviation=round(zscore, 2),
+                    severity=severity,
+                    method="zscore",
+                    description=f"{metric} at {val:.1f} is {abs(zscore):.1f}σ from baseline {expected:.1f}",
+                )
+            )
 
     # Isolation Forest detection
     if method in ("isolation_forest", "both"):
@@ -179,25 +187,37 @@ def get_anomalies(
             iso_anomalies = iso_results[iso_results["is_anomaly"]]
 
             for idx in iso_anomalies.index:
-                ts = zone_df.loc[idx, "timestamp"] if "timestamp" in zone_df.columns else "unknown"
-                val = float(zone_df.loc[idx, column_name]) if column_name in zone_df.columns else 0
+                ts = (
+                    zone_df.loc[idx, "timestamp"]
+                    if "timestamp" in zone_df.columns
+                    else "unknown"
+                )
+                val = (
+                    float(zone_df.loc[idx, column_name])
+                    if column_name in zone_df.columns
+                    else 0
+                )
                 score = float(iso_anomalies.loc[idx, "anomaly_score"])
                 severity = classify_severity(score * 3)
 
                 # Avoid duplicates with z-score (same timestamp + zone)
                 ts_str = str(ts)
-                if not any(a.timestamp == ts_str and a.method == "zscore" for a in anomalies):
-                    anomalies.append(Anomaly(
-                        zone_id=zone_id,
-                        metric=metric,
-                        timestamp=ts_str,
-                        value=round(val, 2),
-                        expected=round(expected, 2),
-                        deviation=round(score, 2),
-                        severity=severity,
-                        method="isolation_forest",
-                        description=f"Multivariate anomaly detected (score={score:.2f})",
-                    ))
+                if not any(
+                    a.timestamp == ts_str and a.method == "zscore" for a in anomalies
+                ):
+                    anomalies.append(
+                        Anomaly(
+                            zone_id=zone_id,
+                            metric=metric,
+                            timestamp=ts_str,
+                            value=round(val, 2),
+                            expected=round(expected, 2),
+                            deviation=round(score, 2),
+                            severity=severity,
+                            method="isolation_forest",
+                            description=f"Multivariate anomaly detected (score={score:.2f})",
+                        )
+                    )
 
     # Sort by timestamp, limit to most recent
     anomalies.sort(key=lambda a: a.timestamp, reverse=True)

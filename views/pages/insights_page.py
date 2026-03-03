@@ -62,8 +62,7 @@ def create_insights_page() -> html.Div:
                 },
             ),
             html.Div(
-                "Ask questions about building operations — "
-                "powered by Claude API",
+                "Ask questions about building operations — powered by Claude API",
                 style={"color": TEXT_TERTIARY, "fontSize": "14px"},
             ),
         ],

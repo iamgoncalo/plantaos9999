@@ -10,9 +10,11 @@ from __future__ import annotations
 from datetime import datetime
 
 from dash import Input, Output, State, ctx, html
-from loguru import logger
 
 from utils.time_utils import current_shift
+from views.callbacks.comfort_cb import register_comfort_callbacks
+from views.callbacks.energy_cb import register_energy_callbacks
+from views.callbacks.occupancy_cb import register_occupancy_callbacks
 
 
 # Page title mapping: pathname → display title
@@ -49,6 +51,10 @@ def register_callbacks(app: object) -> None:
     _register_zone_click_callback(app)
     _register_alert_feed_callback(app)
     _register_header_status_callback(app)
+    # Detail page callbacks
+    register_energy_callbacks(app)
+    register_comfort_callbacks(app)
+    register_occupancy_callbacks(app)
 
 
 def _register_routing_callback(app: object) -> None:
@@ -324,12 +330,14 @@ def _register_alert_feed_callback(app: object) -> None:
                     severity = "critical" if status == "critical" else "warning"
 
                     msg = _build_alert_message(zone, name)
-                    alerts.append({
-                        "message": msg,
-                        "severity": severity,
-                        "timestamp": zone.get("timestamp", ""),
-                        "zone_id": zone["zone_id"],
-                    })
+                    alerts.append(
+                        {
+                            "message": msg,
+                            "severity": severity,
+                            "timestamp": zone.get("timestamp", ""),
+                            "zone_id": zone["zone_id"],
+                        }
+                    )
 
         # Critical alerts first
         alerts.sort(key=lambda a: a["severity"] == "critical", reverse=True)

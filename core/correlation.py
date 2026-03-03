@@ -7,13 +7,12 @@ for insight generation.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 from loguru import logger
 from pydantic import BaseModel
 from scipy import stats
 
-from config.building import CFT_BUILDING, get_monitored_zones
+from config.building import get_monitored_zones
 from data.store import store
 
 
@@ -54,14 +53,12 @@ def energy_occupancy_correlation(
         return _empty_result("total_kwh", "occupant_count")
 
     # Aggregate to 15-min resolution and align
-    energy_ts = (
-        energy_df.groupby(pd.Grouper(key="timestamp", freq="15min"))["total_kwh"]
-        .sum()
-    )
-    occ_ts = (
-        occ_df.groupby(pd.Grouper(key="timestamp", freq="15min"))["occupant_count"]
-        .sum()
-    )
+    energy_ts = energy_df.groupby(pd.Grouper(key="timestamp", freq="15min"))[
+        "total_kwh"
+    ].sum()
+    occ_ts = occ_df.groupby(pd.Grouper(key="timestamp", freq="15min"))[
+        "occupant_count"
+    ].sum()
 
     # Align on common timestamps
     aligned = pd.DataFrame({"energy": energy_ts, "occupancy": occ_ts}).dropna()
@@ -119,10 +116,9 @@ def comfort_weather_correlation(
         return _empty_result(indoor_col, outdoor_col)
 
     # Aggregate comfort to 15-min resolution
-    indoor_ts = (
-        comfort_df.groupby(pd.Grouper(key="timestamp", freq="15min"))[indoor_col]
-        .mean()
-    )
+    indoor_ts = comfort_df.groupby(pd.Grouper(key="timestamp", freq="15min"))[
+        indoor_col
+    ].mean()
     outdoor_ts = weather_df.set_index("timestamp")[outdoor_col]
 
     aligned = pd.DataFrame({"indoor": indoor_ts, "outdoor": outdoor_ts}).dropna()
@@ -131,7 +127,9 @@ def comfort_weather_correlation(
 
     coeff, p_val = _compute_pearson(aligned["indoor"], aligned["outdoor"])
 
-    interpretation = _interpret_correlation(coeff, f"indoor {metric}", f"outdoor {metric}")
+    interpretation = _interpret_correlation(
+        coeff, f"indoor {metric}", f"outdoor {metric}"
+    )
 
     return CorrelationResult(
         metric_a=indoor_col,
@@ -155,7 +153,9 @@ def compute_all_correlations() -> dict[str, CorrelationResult]:
     # Building-wide correlations
     results["building_energy_occupancy"] = energy_occupancy_correlation()
     results["building_temp_weather"] = comfort_weather_correlation(metric="temperature")
-    results["building_humidity_weather"] = comfort_weather_correlation(metric="humidity")
+    results["building_humidity_weather"] = comfort_weather_correlation(
+        metric="humidity"
+    )
 
     # Per-zone correlations for monitored zones
     monitored = get_monitored_zones()

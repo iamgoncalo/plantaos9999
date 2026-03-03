@@ -6,9 +6,9 @@ equipment 15%, other 5%), baseline comparisons, and detected anomalies.
 
 from __future__ import annotations
 
-from dash import html
+from dash import dcc, html
 
-from config.theme import TEXT_TERTIARY
+from views.charts import chart_card
 from views.components.kpi_card import create_kpi_card
 
 
@@ -16,22 +16,35 @@ def create_energy_page() -> html.Div:
     """Create the energy analysis page layout.
 
     Returns:
-        Dash html.Div containing the energy page with breakdown
-        charts, baseline comparison, and anomaly markers.
+        Dash html.Div containing the energy page with KPIs,
+        time-range selector, and four interactive charts.
     """
+    # Time range selector
+    time_selector = html.Div(
+        [
+            dcc.RadioItems(
+                id="energy-time-range",
+                options=[
+                    {"label": "Today", "value": "today"},
+                    {"label": "7 Days", "value": "7d"},
+                    {"label": "30 Days", "value": "30d"},
+                ],
+                value="today",
+                className="time-range-selector",
+                inline=True,
+            ),
+        ],
+        className="page-controls",
+    )
+
+    # 4 KPI cards
     kpi_grid = html.Div(
         [
             create_kpi_card(
-                title="Today's Consumption",
+                title="Total Consumption",
                 value="—",
                 unit="kWh",
                 icon="mdi:flash",
-            ),
-            create_kpi_card(
-                title="HVAC Load",
-                value="—",
-                unit="kWh",
-                icon="mdi:air-conditioner",
             ),
             create_kpi_card(
                 title="vs. Baseline",
@@ -40,23 +53,40 @@ def create_energy_page() -> html.Div:
                 icon="mdi:chart-line",
             ),
             create_kpi_card(
-                title="Anomalies",
+                title="Peak Hour",
                 value="—",
-                icon="mdi:alert-circle-outline",
+                icon="mdi:clock-alert-outline",
+            ),
+            create_kpi_card(
+                title="Cost Estimate",
+                value="—",
+                unit="€",
+                icon="mdi:currency-eur",
             ),
         ],
         className="grid-4",
+        id="energy-kpi-grid",
     )
 
-    chart_placeholder = html.Div(
-        "Energy breakdown charts will be rendered here",
-        className="card empty-state",
-        style={"minHeight": "300px"},
-        id="energy-charts",
+    # Charts: 2×2 grid
+    charts_row_1 = html.Div(
+        [
+            chart_card("energy-chart-timeline", "Energy vs. Baseline"),
+            chart_card("energy-chart-breakdown", "Consumption by Category"),
+        ],
+        className="chart-grid",
+    )
+
+    charts_row_2 = html.Div(
+        [
+            chart_card("energy-chart-heatmap", "Zone Energy Heatmap"),
+            chart_card("energy-chart-scatter", "Energy vs. Occupancy"),
+        ],
+        className="chart-grid",
     )
 
     return html.Div(
-        [kpi_grid, chart_placeholder],
+        [time_selector, kpi_grid, charts_row_1, charts_row_2],
         className="page-enter",
         style={"display": "flex", "flexDirection": "column", "gap": "16px"},
     )

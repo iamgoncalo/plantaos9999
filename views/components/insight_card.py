@@ -11,7 +11,7 @@ from datetime import datetime
 from dash import html
 from dash_iconify import DashIconify
 
-from config.theme import ACCENT_BLUE, TEXT_TERTIARY
+from config.theme import ACCENT_BLUE
 
 
 def create_insight_card(
@@ -40,14 +40,10 @@ def create_insight_card(
 
     if timestamp:
         ts_str = timestamp.strftime("%H:%M · %d %b")
-        header_children.append(
-            html.Span(ts_str, className="insight-timestamp")
-        )
+        header_children.append(html.Span(ts_str, className="insight-timestamp"))
 
     if zone_id:
-        header_children.append(
-            html.Span(zone_id, className="insight-zone-badge")
-        )
+        header_children.append(html.Span(zone_id, className="insight-zone-badge"))
 
     header = html.Div(header_children, className="insight-header")
 

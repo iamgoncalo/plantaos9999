@@ -15,12 +15,11 @@ from dash_iconify import DashIconify
 from config.building import get_zone_by_id
 from config.theme import (
     FONT_SIZE_XS,
-    TEXT_PRIMARY,
     TEXT_SECONDARY,
     TEXT_TERTIARY,
     WEIGHT_SEMIBOLD,
 )
-from utils.colors import status_color, zone_health_to_color
+from utils.colors import zone_health_to_color
 
 
 def create_zone_panel(zone_id: str | None = None) -> html.Div:
@@ -81,7 +80,9 @@ def create_zone_panel(zone_id: str | None = None) -> html.Div:
                             "fontSize": "13px",
                             "color": TEXT_TERTIARY,
                         },
-                    ) if zone.capacity else None,
+                    )
+                    if zone.capacity
+                    else None,
                 ],
                 style={"marginTop": "4px"},
             ),
@@ -109,12 +110,48 @@ def create_zone_panel(zone_id: str | None = None) -> html.Div:
 
 # ── Metric display config ────────────────────
 _METRICS: list[dict[str, str]] = [
-    {"key": "temperature_c", "label": "Temperature", "icon": "mdi:thermometer", "unit": "°C", "fmt": ".1f"},
-    {"key": "humidity_pct", "label": "Humidity", "icon": "mdi:water-percent", "unit": "%", "fmt": ".0f"},
-    {"key": "co2_ppm", "label": "CO₂", "icon": "mdi:molecule-co2", "unit": "ppm", "fmt": ".0f"},
-    {"key": "illuminance_lux", "label": "Illuminance", "icon": "mdi:lightbulb-outline", "unit": "lux", "fmt": ".0f"},
-    {"key": "occupant_count", "label": "Occupancy", "icon": "mdi:account-group", "unit": "", "fmt": ".0f"},
-    {"key": "total_energy_kwh", "label": "Energy", "icon": "mdi:flash", "unit": "kWh", "fmt": ".2f"},
+    {
+        "key": "temperature_c",
+        "label": "Temperature",
+        "icon": "mdi:thermometer",
+        "unit": "°C",
+        "fmt": ".1f",
+    },
+    {
+        "key": "humidity_pct",
+        "label": "Humidity",
+        "icon": "mdi:water-percent",
+        "unit": "%",
+        "fmt": ".0f",
+    },
+    {
+        "key": "co2_ppm",
+        "label": "CO₂",
+        "icon": "mdi:molecule-co2",
+        "unit": "ppm",
+        "fmt": ".0f",
+    },
+    {
+        "key": "illuminance_lux",
+        "label": "Illuminance",
+        "icon": "mdi:lightbulb-outline",
+        "unit": "lux",
+        "fmt": ".0f",
+    },
+    {
+        "key": "occupant_count",
+        "label": "Occupancy",
+        "icon": "mdi:account-group",
+        "unit": "",
+        "fmt": ".0f",
+    },
+    {
+        "key": "total_energy_kwh",
+        "label": "Energy",
+        "icon": "mdi:flash",
+        "unit": "kWh",
+        "fmt": ".2f",
+    },
 ]
 
 
@@ -162,7 +199,12 @@ def create_zone_detail(
                         style={"fontSize": "12px", "color": TEXT_TERTIARY},
                     ),
                 ],
-                style={"display": "flex", "alignItems": "center", "gap": "8px", "marginTop": "4px"},
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "8px",
+                    "marginTop": "4px",
+                },
             ),
         ],
         style={"marginBottom": "16px"},

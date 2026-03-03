@@ -1102,3 +1102,121 @@ body {
 .chat-send-btn:hover {
     opacity: 0.85;
 }
+
+/* ═══════════════════════════════════════════════
+   3D Building View
+   ═══════════════════════════════════════════════ */
+
+.viewer-3d-container {
+    position: relative;
+    width: 100%;
+    min-height: 640px;
+    height: calc(100vh - var(--header-height) - 80px);
+    border-radius: var(--card-radius);
+    overflow: hidden;
+    background: var(--bg-card);
+    box-shadow: var(--card-shadow);
+}
+
+.viewer-3d-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: var(--card-radius);
+    display: block;
+}
+
+.viewer-3d-controls {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: var(--card-radius);
+    padding: 16px;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(229, 229, 234, 0.6);
+}
+
+.viewer-3d-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.viewer-3d-control-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+}
+
+.viewer-3d-reset-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-family: var(--font-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.viewer-3d-reset-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.viewer-3d-legend {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 12px;
+    padding: 8px 16px;
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(229, 229, 234, 0.6);
+}
+
+.viewer-3d-legend-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+}
+
+.viewer-3d-legend-gradient {
+    width: 120px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, #FF3B30, #FF9500, #FFD60A, #34C759);
+}
+
+@media (max-width: 1200px) {
+    .viewer-3d-controls {
+        top: 8px;
+        right: 8px;
+        padding: 12px;
+    }
+
+    .viewer-3d-container {
+        min-height: 480px;
+    }
+}

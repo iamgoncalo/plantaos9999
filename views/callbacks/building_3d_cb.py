@@ -1,0 +1,69 @@
+"""Callbacks for the 3D building view page.
+
+Wires building-state-store, metric selector, and floor selector
+to the Three.js iframe srcdoc via generate_3d_html().
+"""
+
+from __future__ import annotations
+
+from dash import Input, Output
+
+
+def register_3d_callbacks(app: object) -> None:
+    """Register all 3D building view callbacks.
+
+    Args:
+        app: The Dash application instance.
+    """
+    _register_3d_update(app)
+
+
+def _register_3d_update(app: object) -> None:
+    """Update the 3D iframe when state, metric, or floor changes."""
+
+    @app.callback(
+        Output("3d-viewer-iframe", "srcDoc"),
+        Input("building-state-store", "data"),
+        Input("3d-metric-selector", "value"),
+        Input("3d-floor-selector", "value"),
+    )
+    def update_3d_view(
+        state_data: dict | None,
+        metric: str | None,
+        visible_floors: str | None,
+    ) -> str:
+        """Regenerate 3D HTML from current building state.
+
+        Args:
+            state_data: Serialized BuildingState dict.
+            metric: Selected metric for zone coloring.
+            visible_floors: Which floors to show.
+
+        Returns:
+            HTML string for the iframe srcdoc.
+        """
+        from views.floorplan.renderer_3d import generate_3d_html
+
+        metric = metric or "freedom_index"
+        visible_floors = visible_floors or "all"
+
+        # Extract zone data from building state
+        zone_data: dict = {}
+        if state_data:
+            for floor_state in state_data.get("floors", []):
+                for zone in floor_state.get("zones", []):
+                    zone_data[zone["zone_id"]] = {
+                        "freedom_index": zone.get("freedom_index", 50),
+                        "temperature_c": zone.get("temperature_c"),
+                        "humidity_pct": zone.get("humidity_pct"),
+                        "co2_ppm": zone.get("co2_ppm"),
+                        "occupant_count": zone.get("occupant_count", 0),
+                        "total_energy_kwh": zone.get("total_energy_kwh", 0),
+                        "status": zone.get("status", "unknown"),
+                    }
+
+        return generate_3d_html(
+            building_data=zone_data,
+            metric=metric,
+            visible_floors=visible_floors,
+        )

@@ -1,44 +1,535 @@
 """Three.js HTML generator for 3D interactive building view.
 
-Generates an HTML string containing a Three.js scene (r128) that
-renders the CFT building in 3D with interactive zone selection
-and metric overlays. Embedded via Dash html.Iframe.
+Generates a self-contained HTML page with an inline Three.js r128 scene
+that renders the CFT building in 3D with interactive zone selection,
+metric overlays, and OrbitControls. Embedded via Dash html.Iframe srcdoc.
 """
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
+from config.building import get_zone_by_id
+from config.theme import (
+    BORDER_DEFAULT,
+    STATUS_CRITICAL,
+    STATUS_HEALTHY,
+    STATUS_WARNING,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+)
+from utils.colors import interpolate_color, zone_health_to_color
+from views.floorplan.zones_geometry import (
+    FLOOR_0_ZONES,
+    FLOOR_1_ZONES,
+    FLOOR_HEIGHT_3D_M,
+    FLOOR_HEIGHT_M,
+    FLOOR_WIDTH_M,
+)
+
+# Abbreviated names for compact 3D labels (mirrors renderer_2d.py)
+_NAME_SHORT: dict[str, str] = {
+    "Sala Multiusos": "Multiusos",
+    "Biblioteca / Espólio HORSE": "Biblioteca",
+    "Zona Social / Copa": "Copa",
+    "Sala de Formação 1": "Form. 1",
+    "Sala de Formação 2": "Form. 2",
+    "Sala de Formação 3": "Form. 3",
+    "Sala de Reunião": "Reunião",
+    "Sala de Informática": "Informática",
+    "Aula / Câmara": "Aula",
+    "Produção / Exibição Armazém": "Produção",
+    "Sala Dojo Segurança": "Dojo",
+    "Área de Monitorização": "Monitor",
+    "WC Masculino": "WC M",
+    "WC Feminino": "WC F",
+    "WC Piso 1": "WC",
+    "Sala Grande": "Sala Grande",
+    "Sala Pequena": "Sala Peq.",
+}
+
+# Wall height (leaves a gap to the 3.2m ceiling for visual breathing room)
+_WALL_HEIGHT = 2.8
+# Inset from polygon bounds so adjacent rooms have a visible gap
+_ZONE_PADDING = 0.05
+
 
 def generate_3d_html(
-    building_data: dict | None = None,
-    selected_zone: str | None = None,
+    building_data: dict[str, dict[str, Any]] | None = None,
+    metric: str = "freedom_index",
+    visible_floors: str = "all",
 ) -> str:
-    """Generate HTML/JS for the 3D building view.
+    """Generate a complete HTML page with an embedded Three.js 3D building.
 
     Args:
-        building_data: Dict mapping zone_id to metric values for coloring.
-        selected_zone: Zone to highlight.
+        building_data: Dict mapping zone_id to metric values dict.
+        metric: Which metric to color zones by
+            ('freedom_index', 'temperature_c', 'occupant_count', 'total_energy_kwh').
+        visible_floors: Which floors to show ('all', '0', '1').
 
     Returns:
-        HTML string containing the Three.js scene.
+        Self-contained HTML string for use as Iframe srcDoc.
     """
-    ...
+    building_data = building_data or {}
+    zone_js = _build_zone_meshes_js(building_data, metric, visible_floors)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  html, body {{ width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }}
+  canvas {{ display: block; }}
+  #tooltip {{
+    position: absolute;
+    pointer-events: none;
+    display: none;
+    background: rgba(255,255,255,0.96);
+    border: 1px solid {BORDER_DEFAULT};
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 12px;
+    color: {TEXT_PRIMARY};
+    line-height: 1.5;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    max-width: 240px;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }}
+  #tooltip .tt-title {{
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: {TEXT_PRIMARY};
+  }}
+  #tooltip .tt-row {{
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 2px 0;
+  }}
+  #tooltip .tt-label {{
+    color: {TEXT_SECONDARY};
+  }}
+  #tooltip .tt-value {{
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    text-align: right;
+  }}
+  #tooltip .tt-divider {{
+    border-top: 1px solid #E5E5EA;
+    margin: 6px 0;
+  }}
+</style>
+</head>
+<body>
+<div id="tooltip"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function() {{
+  "use strict";
+
+  // ── Scene setup ──────────────────────────────
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0xf8fafc, 60, 140);
+
+  var camera = new THREE.PerspectiveCamera(
+    40, window.innerWidth / window.innerHeight, 0.5, 200
+  );
+  camera.position.set(32, 28, 38);
+
+  var renderer = new THREE.WebGLRenderer({{
+    antialias: true,
+    alpha: true,
+    powerPreference: "high-performance"
+  }});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0xf8fafc, 1);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  document.body.appendChild(renderer.domElement);
+
+  // ── Controls ─────────────────────────────────
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 12;
+  controls.maxDistance = 85;
+  controls.maxPolarAngle = Math.PI / 2.2;
+  controls.target.set({FLOOR_WIDTH_M / 2:.1f}, 2, {FLOOR_HEIGHT_M / 2:.1f});
+  controls.update();
+
+  // ── Lighting ─────────────────────────────────
+  var ambient = new THREE.AmbientLight(0xffffff, 0.55);
+  scene.add(ambient);
+
+  var dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
+  dirLight.position.set(25, 35, 30);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(2048, 2048);
+  dirLight.shadow.camera.left = -40;
+  dirLight.shadow.camera.right = 40;
+  dirLight.shadow.camera.top = 40;
+  dirLight.shadow.camera.bottom = -40;
+  dirLight.shadow.camera.near = 1;
+  dirLight.shadow.camera.far = 100;
+  dirLight.shadow.bias = -0.001;
+  dirLight.shadow.radius = 4;
+  scene.add(dirLight);
+
+  var hemiLight = new THREE.HemisphereLight(0xddeeff, 0xffeedd, 0.25);
+  scene.add(hemiLight);
+
+  // ── Ground plane ─────────────────────────────
+  var groundGeo = new THREE.PlaneGeometry(60, 50);
+  var groundMat = new THREE.MeshStandardMaterial({{
+    color: 0xeef1f5,
+    roughness: 0.95,
+    metalness: 0.0
+  }});
+  var ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.set({FLOOR_WIDTH_M / 2:.1f}, -0.05, {FLOOR_HEIGHT_M / 2:.1f});
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // ── Grid lines ───────────────────────────────
+  var gridHelper = new THREE.GridHelper(55, 11, 0xd0d5dd, 0xe0e4ea);
+  gridHelper.position.set({FLOOR_WIDTH_M / 2:.1f}, -0.04, {FLOOR_HEIGHT_M / 2:.1f});
+  scene.add(gridHelper);
+
+  // ── Floor slabs ──────────────────────────────
+  function addFloorSlab(yPos) {{
+    var geo = new THREE.BoxGeometry(
+      {FLOOR_WIDTH_M + 1:.1f}, 0.12, {FLOOR_HEIGHT_M + 1:.1f}
+    );
+    var mat = new THREE.MeshStandardMaterial({{
+      color: 0xf0f2f5,
+      roughness: 0.8,
+      metalness: 0.02,
+      transparent: true,
+      opacity: 0.9
+    }});
+    var slab = new THREE.Mesh(geo, mat);
+    slab.position.set({FLOOR_WIDTH_M / 2:.1f}, yPos, {FLOOR_HEIGHT_M / 2:.1f});
+    slab.receiveShadow = true;
+    scene.add(slab);
+  }}
+  addFloorSlab(0);
+  addFloorSlab({FLOOR_HEIGHT_3D_M:.1f});
+
+  // ── Zone meshes container ────────────────────
+  var zoneMeshes = [];
+  var labelSprites = [];
+
+  function hexToThreeColor(hex) {{
+    return new THREE.Color(hex);
+  }}
+
+  function addZone(id, name, cx, yBase, cz, w, h, d, colorHex, metricsJson, opacity) {{
+    var color = hexToThreeColor(colorHex);
+    var geo = new THREE.BoxGeometry(w, h, d);
+    var mat = new THREE.MeshStandardMaterial({{
+      color: color,
+      roughness: 0.6,
+      metalness: 0.05,
+      transparent: true,
+      opacity: opacity
+    }});
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(cx, yBase + h / 2, cz);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData = {{
+      zoneId: id,
+      zoneName: name,
+      metrics: metricsJson,
+      baseColor: color.clone(),
+      baseOpacity: opacity
+    }};
+    scene.add(mesh);
+    zoneMeshes.push(mesh);
+
+    // ── Edges ──
+    var edgeGeo = new THREE.EdgesGeometry(geo);
+    var edgeMat = new THREE.LineBasicMaterial({{
+      color: 0x999999,
+      transparent: true,
+      opacity: 0.3
+    }});
+    var edges = new THREE.LineSegments(edgeGeo, edgeMat);
+    edges.position.copy(mesh.position);
+    scene.add(edges);
+
+    // ── Label sprite ──
+    if (name && name !== "") {{
+      var canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 64;
+      var ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      var radius = 10;
+      ctx.beginPath();
+      ctx.moveTo(radius, 2);
+      ctx.lineTo(254 - radius, 2);
+      ctx.quadraticCurveTo(254, 2, 254, 2 + radius);
+      ctx.lineTo(254, 62 - radius);
+      ctx.quadraticCurveTo(254, 62, 254 - radius, 62);
+      ctx.lineTo(radius, 62);
+      ctx.quadraticCurveTo(2, 62, 2, 62 - radius);
+      ctx.lineTo(2, 2 + radius);
+      ctx.quadraticCurveTo(2, 2, radius, 2);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.font = "bold 22px Inter, -apple-system, sans-serif";
+      ctx.fillStyle = "#1D1D1F";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(name, 128, 32);
+
+      var tex = new THREE.CanvasTexture(canvas);
+      tex.minFilter = THREE.LinearFilter;
+      var spriteMat = new THREE.SpriteMaterial({{
+        map: tex,
+        transparent: true,
+        depthTest: false
+      }});
+      var sprite = new THREE.Sprite(spriteMat);
+      sprite.position.set(cx, yBase + h + 0.6, cz);
+      sprite.scale.set(3.5, 0.875, 1);
+      scene.add(sprite);
+      labelSprites.push(sprite);
+    }}
+  }}
+
+  // ── Add zone meshes (generated from Python) ──
+  {zone_js}
+
+  // ── Raycaster (hover) ────────────────────────
+  var raycaster = new THREE.Raycaster();
+  var mouse = new THREE.Vector2();
+  var tooltip = document.getElementById("tooltip");
+  var hoveredMesh = null;
+
+  function onMouseMove(event) {{
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    var intersects = raycaster.intersectObjects(zoneMeshes);
+
+    if (intersects.length > 0) {{
+      var hit = intersects[0].object;
+      if (hoveredMesh !== hit) {{
+        resetHover();
+        hoveredMesh = hit;
+        hit.material.emissive.setHex(0x222222);
+        hit.material.emissiveIntensity = 0.15;
+      }}
+      var ud = hit.userData;
+      var m = ud.metrics || {{}};
+      var html = '<div class="tt-title">' + ud.zoneName + '</div>';
+      html += '<div class="tt-divider"></div>';
+      if (m.temperature_c != null)
+        html += '<div class="tt-row"><span class="tt-label">Temperature</span>'
+          + '<span class="tt-value">' + m.temperature_c.toFixed(1) + ' °C</span></div>';
+      if (m.humidity_pct != null)
+        html += '<div class="tt-row"><span class="tt-label">Humidity</span>'
+          + '<span class="tt-value">' + m.humidity_pct.toFixed(0) + '%</span></div>';
+      if (m.co2_ppm != null)
+        html += '<div class="tt-row"><span class="tt-label">CO₂</span>'
+          + '<span class="tt-value">' + m.co2_ppm.toFixed(0) + ' ppm</span></div>';
+      if (m.occupant_count != null)
+        html += '<div class="tt-row"><span class="tt-label">Occupancy</span>'
+          + '<span class="tt-value">' + m.occupant_count + '</span></div>';
+      if (m.total_energy_kwh != null)
+        html += '<div class="tt-row"><span class="tt-label">Energy</span>'
+          + '<span class="tt-value">' + m.total_energy_kwh.toFixed(2) + ' kWh</span></div>';
+      if (m.freedom_index != null) {{
+        html += '<div class="tt-divider"></div>';
+        html += '<div class="tt-row"><span class="tt-label">Freedom Index</span>'
+          + '<span class="tt-value" style="font-weight:600">'
+          + m.freedom_index.toFixed(0) + '/100</span></div>';
+      }}
+
+      tooltip.innerHTML = html;
+      tooltip.style.display = "block";
+      var tx = event.clientX + 16;
+      var ty = event.clientY - 10;
+      if (tx + 260 > window.innerWidth) tx = event.clientX - 260;
+      if (ty + 200 > window.innerHeight) ty = event.clientY - 200;
+      tooltip.style.left = tx + "px";
+      tooltip.style.top = ty + "px";
+    }} else {{
+      resetHover();
+      tooltip.style.display = "none";
+    }}
+  }}
+
+  function resetHover() {{
+    if (hoveredMesh) {{
+      hoveredMesh.material.emissive.setHex(0x000000);
+      hoveredMesh.material.emissiveIntensity = 0;
+      hoveredMesh = null;
+    }}
+  }}
+
+  window.addEventListener("mousemove", onMouseMove, false);
+
+  // ── Window resize ────────────────────────────
+  window.addEventListener("resize", function() {{
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }});
+
+  // ── Animation loop ───────────────────────────
+  function animate() {{
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }}
+  animate();
+
+  // ── Public API for reset camera ──────────────
+  window.resetCamera = function() {{
+    camera.position.set(32, 28, 38);
+    controls.target.set({FLOOR_WIDTH_M / 2:.1f}, 2, {FLOOR_HEIGHT_M / 2:.1f});
+    controls.update();
+  }};
+
+}})();
+</script>
+</body>
+</html>"""
 
 
-def _zone_to_mesh_params(
-    zone_id: str,
-    floor: int,
-    polygon: list[tuple[float, float]],
-    height: float = 3.0,
-) -> dict:
-    """Convert a zone polygon to Three.js mesh parameters.
+def _build_zone_meshes_js(
+    building_data: dict[str, dict[str, Any]],
+    metric: str,
+    visible_floors: str,
+) -> str:
+    """Generate JavaScript addZone() calls for all visible zones.
 
     Args:
-        zone_id: Zone identifier.
-        floor: Floor number (affects vertical offset).
-        polygon: 2D polygon vertices.
-        height: Extrusion height in meters.
+        building_data: Zone metric data keyed by zone_id.
+        metric: Which metric to use for coloring.
+        visible_floors: Which floors to render ('all', '0', '1').
 
     Returns:
-        Dict with position, geometry, and material parameters.
+        JavaScript code string with addZone() calls.
     """
-    ...
+    lines: list[str] = []
+
+    floor_zones: list[tuple[int, str, list[tuple[float, float]]]] = []
+
+    if visible_floors in ("all", "0"):
+        for zone_id, polygon in FLOOR_0_ZONES.items():
+            floor_zones.append((0, zone_id, polygon))
+
+    if visible_floors in ("all", "1"):
+        for zone_id, polygon in FLOOR_1_ZONES.items():
+            floor_zones.append((1, zone_id, polygon))
+
+    for floor_num, zone_id, polygon in floor_zones:
+        zone_info = get_zone_by_id(zone_id)
+        name = zone_info.name if zone_info else zone_id
+        short_name = _NAME_SHORT.get(name, name)
+        capacity = zone_info.capacity if zone_info else 0
+
+        # Bounding box
+        xs = [p[0] for p in polygon]
+        ys = [p[1] for p in polygon]
+        x_min, x_max = min(xs) + _ZONE_PADDING, max(xs) - _ZONE_PADDING
+        y_min, y_max = min(ys) + _ZONE_PADDING, max(ys) - _ZONE_PADDING
+        w = x_max - x_min
+        d = y_max - y_min
+        cx = (x_min + x_max) / 2
+        cz = (y_min + y_max) / 2
+
+        # Y offset based on floor
+        y_base = 0.06 if floor_num == 0 else FLOOR_HEIGHT_3D_M + 0.06
+
+        # Get metrics and compute color
+        zd = building_data.get(zone_id, {})
+        color = _get_zone_color(zd, metric)
+
+        # Opacity: floor 1 is slightly transparent in "all" mode
+        opacity = 0.7 if (visible_floors == "all" and floor_num == 1) else 0.88
+
+        # Metrics JSON for tooltip
+        metrics_json = json.dumps(zd) if zd else "{}"
+
+        # Only show labels for zones with capacity > 0
+        label = short_name if capacity > 0 else ""
+
+        lines.append(
+            f'  addZone("{zone_id}", "{label}", '
+            f"{cx:.2f}, {y_base:.2f}, {cz:.2f}, "
+            f"{w:.2f}, {_WALL_HEIGHT}, {d:.2f}, "
+            f'"{color}", {metrics_json}, {opacity});'
+        )
+
+    return "\n".join(lines)
+
+
+def _get_zone_color(
+    zone_data: dict[str, Any],
+    metric: str,
+) -> str:
+    """Determine the hex color for a zone based on metric value.
+
+    Args:
+        zone_data: Metric values dict for the zone.
+        metric: Which metric to color by.
+
+    Returns:
+        Hex color string.
+    """
+    if not zone_data:
+        return "#C8CCD0"
+
+    if metric == "freedom_index":
+        score = zone_data.get("freedom_index", 50.0)
+        return zone_health_to_color(float(score))
+
+    if metric == "temperature_c":
+        temp = zone_data.get("temperature_c")
+        if temp is None:
+            return "#C8CCD0"
+        return interpolate_color(
+            float(temp),
+            16.0,
+            30.0,
+            [STATUS_CRITICAL, STATUS_WARNING, STATUS_HEALTHY],
+        )
+
+    if metric == "occupant_count":
+        occ = zone_data.get("occupant_count", 0)
+        return interpolate_color(
+            float(occ),
+            0.0,
+            50.0,
+            [STATUS_HEALTHY, STATUS_WARNING, STATUS_CRITICAL],
+        )
+
+    if metric == "total_energy_kwh":
+        energy = zone_data.get("total_energy_kwh", 0)
+        return interpolate_color(
+            float(energy),
+            0.0,
+            15.0,
+            [STATUS_HEALTHY, STATUS_WARNING, STATUS_CRITICAL],
+        )
+
+    return zone_health_to_color(zone_data.get("freedom_index", 50.0))

@@ -86,14 +86,14 @@ def generate_comfort_data(
                 temp[i] = (
                     temp[i] * (1 - drift_factor) + outdoor_temp_arr[i] * drift_factor
                 )
-        temp += rng.normal(0, 0.3, n_timestamps)
+        temp += rng.normal(0, 0.2, n_timestamps)  # sensor noise (sigma=0.2)
 
         # --- Humidity ---
         humidity = np.zeros(n_timestamps)
         for i in range(n_timestamps):
             humidity[i] = _humidity_profile(hours[i], occ_ratios[i], outdoor_hum_arr[i])
         humidity[is_raining_arr] += rng.uniform(3, 8, is_raining_arr.sum())
-        humidity += rng.normal(0, 2.0, n_timestamps)
+        humidity += rng.normal(0, 0.5, n_timestamps)  # sensor noise (sigma=0.5)
         humidity = np.clip(humidity, 30, 80)
 
         # --- CO2 ---
@@ -112,7 +112,7 @@ def generate_comfort_data(
         for i in range(n_timestamps):
             if occ_ratios[i] < 0.05 and 6 <= hours[i] < 22:
                 lux[i] *= 0.15  # Empty room, lights mostly off
-        lux += rng.normal(0, 15, n_timestamps)
+        lux += rng.normal(0, 5.0, n_timestamps)  # sensor noise (sigma=5.0)
         lux = np.clip(lux, 0, 1200)
 
         zone_df = pd.DataFrame(
@@ -129,11 +129,46 @@ def generate_comfort_data(
 
     result = pd.concat(all_records, ignore_index=True)
 
+    # Apply sensor-model noise as a final pass
+    result = _apply_noise(result, rng)
+
     # Inject comfort anomalies
     result = _inject_comfort_anomalies(
         result, sensor_zones, days, rng, outdoor_temp_arr
     )
 
+    return result
+
+
+def _apply_noise(df: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
+    """Apply sensor-model Gaussian noise to comfort metrics.
+
+    Adds realistic measurement noise matching sensor hardware specs:
+    - temperature: sigma=0.2 C
+    - humidity: sigma=0.5 %
+    - co2: sigma=15.0 ppm
+    - illuminance: sigma=5.0 lux
+
+    Args:
+        df: Comfort DataFrame with metric columns.
+        rng: NumPy random generator.
+
+    Returns:
+        DataFrame with sensor noise applied and values clipped to
+        physically valid ranges.
+    """
+    result = df.copy()
+    n = len(result)
+    noise_spec: dict[str, tuple[float, float, float]] = {
+        # column: (sigma, clip_min, clip_max)
+        "temperature_c": (0.2, -10.0, 50.0),
+        "humidity_pct": (0.5, 0.0, 100.0),
+        "co2_ppm": (15.0, 350.0, 5000.0),
+        "illuminance_lux": (5.0, 0.0, 10000.0),
+    }
+    for col, (sigma, lo, hi) in noise_spec.items():
+        if col in result.columns:
+            result[col] = np.clip(result[col] + rng.normal(0, sigma, n), lo, hi)
     return result
 
 

@@ -150,9 +150,38 @@ def generate_energy_data(
 
     result = pd.concat(all_records, ignore_index=True)
 
+    # Apply energy-meter sensor noise (additive, sigma=0.05 kWh)
+    result = _apply_meter_noise(result, rng)
+
     # Inject anomalies
     result = _inject_energy_anomalies(result, zones, days, rng)
 
+    return result
+
+
+def _apply_meter_noise(
+    df: pd.DataFrame, rng: np.random.Generator, sigma: float = 0.05
+) -> pd.DataFrame:
+    """Apply additive Gaussian noise simulating energy meter imprecision.
+
+    Models the measurement noise of energy sub-meters (sigma=0.05 kWh)
+    as specified in the sensor catalog for the energy_meter type.
+
+    Args:
+        df: Energy DataFrame with kWh columns.
+        rng: NumPy random generator.
+        sigma: Standard deviation of additive noise in kWh.
+
+    Returns:
+        DataFrame with meter noise applied, values clipped to non-negative.
+    """
+    result = df.copy()
+    n = len(result)
+    kwh_cols = ["hvac_kwh", "lighting_kwh", "equipment_kwh", "other_kwh"]
+    for col in kwh_cols:
+        if col in result.columns:
+            result[col] = np.clip(result[col] + rng.normal(0, sigma, n), 0, None)
+    result["total_kwh"] = result[kwh_cols].sum(axis=1).round(4)
     return result
 
 

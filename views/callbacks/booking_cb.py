@@ -57,11 +57,14 @@ def _register_book_room(app: object) -> None:
         Output("booking-create-confirm", "displayed"),
         Output("booking-create-confirm", "message"),
         Input({"type": "book-room-btn", "index": ALL}, "n_clicks"),
+        State("url", "pathname"),
         prevent_initial_call=True,
     )
     @safe_callback
-    def trigger_book(n_clicks_list: list) -> tuple:
+    def trigger_book(n_clicks_list: list, pathname: str | None) -> tuple:
         """Store zone ID and open create-confirm dialog."""
+        if pathname != "/booking":
+            return no_update, no_update, no_update
         if not any(n_clicks_list):
             return no_update, no_update, no_update
         triggered_id = ctx.triggered_id
@@ -145,11 +148,14 @@ def _register_cancel_trigger(app: object) -> None:
         Output("booking-cancel-index-store", "data"),
         Output("booking-cancel-confirm", "displayed"),
         Input({"type": "cancel-booking-btn", "index": ALL}, "n_clicks"),
+        State("url", "pathname"),
         prevent_initial_call=True,
     )
     @safe_callback
-    def trigger_cancel(n_clicks_list: list) -> tuple:
+    def trigger_cancel(n_clicks_list: list, pathname: str | None) -> tuple:
         """Store booking index and open cancel dialog."""
+        if pathname != "/booking":
+            return no_update, no_update
         if not any(n or 0 for n in n_clicks_list):
             return no_update, no_update
         triggered_id = ctx.triggered_id

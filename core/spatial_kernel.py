@@ -176,6 +176,23 @@ def aggregate_zone_state(
     # Compute freedom index
     freedom = compute_zone_freedom(zone_id)
 
+    # Compute AFI metrics (perception, distortion, financial bleed)
+    afi_p, afi_d, afi_f, afi_bleed = 0.0, 1.0, 0.0, 0.0
+    try:
+        from core.afi_engine import (
+            compute_financial_bleed,
+            compute_freedom as afi_compute_freedom,
+        )
+
+        fr = afi_compute_freedom(zone_id)
+        afi_p = fr.P
+        afi_d = fr.D
+        afi_f = fr.F
+        bleed = compute_financial_bleed(zone_id)
+        afi_bleed = bleed.total_bleed_eur_hr
+    except Exception as exc:
+        logger.debug(f"AFI computation skipped for {zone_id}: {exc}")
+
     # Determine status based on worst comfort metric
     status = _classify_zone_status(temp_c, hum_pct, co2, lux)
 
@@ -190,6 +207,10 @@ def aggregate_zone_state(
         total_energy_kwh=round(total_energy, 4),
         freedom_index=freedom,
         status=status,
+        perception=round(afi_p, 4),
+        distortion=round(afi_d, 4),
+        afi_freedom=round(afi_f, 4),
+        financial_bleed_eur_hr=round(afi_bleed, 4),
     )
 
 

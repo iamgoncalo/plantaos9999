@@ -234,6 +234,239 @@ def _tenant_table() -> html.Table:
     )
 
 
+def _build_privacy_section() -> html.Div:
+    """Build the Privacy & Data Governance card for the admin page.
+
+    Contains a data dictionary table, processing architecture description,
+    camera policy, and security overview.
+
+    Returns:
+        html.Div card with privacy and data governance content.
+    """
+    # Data Dictionary table
+    dd_header = html.Thead(
+        html.Tr(
+            [
+                html.Th(
+                    col,
+                    style={
+                        "textAlign": "left",
+                        "padding": "8px 12px",
+                        "fontSize": "12px",
+                        "fontWeight": 600,
+                        "color": TEXT_TERTIARY,
+                        "borderBottom": "1px solid #E5E5EA",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.5px",
+                    },
+                )
+                for col in ["Data Type", "Resolution", "Retention", "Purpose"]
+            ]
+        )
+    )
+
+    dd_rows_data: list[tuple[str, str, str, str]] = [
+        ("Temperature", "5 min", "30 days", "Comfort monitoring"),
+        ("Humidity", "5 min", "30 days", "Comfort monitoring"),
+        (
+            "CO\u2082",
+            "5 min",
+            "30 days",
+            "Air quality & occupancy proxy",
+        ),
+        (
+            "Occupancy Count",
+            "Event-driven",
+            "30 days",
+            "Space utilization",
+        ),
+        ("Energy (kWh)", "15 min", "30 days", "Cost optimization"),
+        ("Door State", "Event-driven", "7 days", "Access patterns"),
+    ]
+
+    dd_body = html.Tbody(
+        [
+            html.Tr(
+                [
+                    html.Td(
+                        dtype,
+                        style={
+                            "padding": "10px 12px",
+                            "fontSize": "14px",
+                            "fontWeight": 500,
+                            "color": TEXT_PRIMARY,
+                        },
+                    ),
+                    html.Td(
+                        resolution,
+                        style={
+                            "padding": "10px 12px",
+                            "fontSize": "13px",
+                            "color": TEXT_SECONDARY,
+                            "fontFamily": "JetBrains Mono",
+                        },
+                    ),
+                    html.Td(
+                        retention,
+                        style={
+                            "padding": "10px 12px",
+                            "fontSize": "13px",
+                            "color": TEXT_SECONDARY,
+                            "fontFamily": "JetBrains Mono",
+                        },
+                    ),
+                    html.Td(
+                        purpose,
+                        style={
+                            "padding": "10px 12px",
+                            "fontSize": "13px",
+                            "color": TEXT_SECONDARY,
+                        },
+                    ),
+                ],
+                style={"borderBottom": "1px solid #F2F2F7"},
+            )
+            for dtype, resolution, retention, purpose in dd_rows_data
+        ]
+    )
+
+    data_dictionary = html.Div(
+        [
+            html.H4(
+                "Data Dictionary",
+                style={
+                    "fontSize": "14px",
+                    "fontWeight": 600,
+                    "color": TEXT_PRIMARY,
+                    "marginBottom": "8px",
+                    "marginTop": 0,
+                },
+            ),
+            html.Table(
+                [dd_header, dd_body],
+                style={
+                    "width": "100%",
+                    "borderCollapse": "collapse",
+                },
+            ),
+        ],
+        style={"marginBottom": "24px"},
+    )
+
+    # Processing Architecture
+    processing_arch = html.Div(
+        [
+            html.H4(
+                "Processing Architecture",
+                style={
+                    "fontSize": "14px",
+                    "fontWeight": 600,
+                    "color": TEXT_PRIMARY,
+                    "marginBottom": "8px",
+                    "marginTop": 0,
+                },
+            ),
+            html.P(
+                "All data processing occurs on-premise. Sensor readings "
+                "\u2192 Edge validation \u2192 Kalman fusion \u2192 Spatial "
+                "kernel \u2192 UI. No raw data leaves the building network. "
+                "Claude API calls send only aggregated metrics, never raw "
+                "sensor data or personal information.",
+                style={
+                    "fontSize": "13px",
+                    "color": TEXT_SECONDARY,
+                    "lineHeight": "1.6",
+                    "margin": 0,
+                },
+            ),
+        ],
+        style={"marginBottom": "24px"},
+    )
+
+    # Camera Policy
+    camera_policy = html.Div(
+        [
+            html.H4(
+                "Camera Policy",
+                style={
+                    "fontSize": "14px",
+                    "fontWeight": 600,
+                    "color": TEXT_PRIMARY,
+                    "marginBottom": "8px",
+                    "marginTop": 0,
+                },
+            ),
+            html.P(
+                "No cameras are deployed in the current sensor tier. "
+                "If deployed: on-edge processing only, no raw images "
+                "stored, only aggregate occupancy counts transmitted.",
+                style={
+                    "fontSize": "13px",
+                    "color": TEXT_SECONDARY,
+                    "lineHeight": "1.6",
+                    "margin": 0,
+                },
+            ),
+        ],
+        style={"marginBottom": "24px"},
+    )
+
+    # Security
+    security = html.Div(
+        [
+            html.H4(
+                "Security",
+                style={
+                    "fontSize": "14px",
+                    "fontWeight": 600,
+                    "color": TEXT_PRIMARY,
+                    "marginBottom": "8px",
+                    "marginTop": 0,
+                },
+            ),
+            html.P(
+                "API keys stored as environment variables, never in source "
+                "code. All inter-service communication uses TLS 1.3. "
+                "Access roles: Admin (full), Operator (view + control), "
+                "Viewer (read-only).",
+                style={
+                    "fontSize": "13px",
+                    "color": TEXT_SECONDARY,
+                    "lineHeight": "1.6",
+                    "margin": 0,
+                },
+            ),
+        ],
+    )
+
+    return html.Div(
+        [
+            html.H3(
+                "Privacy & Data Governance",
+                style={
+                    "fontSize": "16px",
+                    "fontWeight": 600,
+                    "color": TEXT_PRIMARY,
+                    "marginBottom": "16px",
+                    "marginTop": 0,
+                },
+            ),
+            data_dictionary,
+            processing_arch,
+            camera_policy,
+            security,
+        ],
+        className="card",
+        style={
+            "padding": f"{PADDING_CARD}px",
+            "background": BG_CARD,
+            "borderRadius": CARD_RADIUS,
+            "boxShadow": CARD_SHADOW,
+            "marginTop": f"{GAP_ELEMENT}px",
+        },
+    )
+
+
 def create_admin_page() -> html.Div:
     """Create the admin settings page layout.
 
@@ -243,8 +476,7 @@ def create_admin_page() -> html.Div:
     """
     return html.Div(
         [
-            # -- Session store + confirm dialogs --------------------
-            dcc.Store(id="admin-settings-store", storage_type="local"),
+            # -- Confirm dialogs --------------------
             dcc.ConfirmDialog(
                 id="admin-confirm-save",
                 message="Save these settings?",
@@ -1241,6 +1473,8 @@ def create_admin_page() -> html.Div:
                     "marginTop": f"{GAP_ELEMENT}px",
                 },
             ),
+            # -- Privacy & Data Governance ----------------------
+            _build_privacy_section(),
         ],
         className="page-enter",
         style={

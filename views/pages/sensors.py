@@ -12,6 +12,8 @@ from config.theme import (
     CARD_SHADOW,
     GAP_ELEMENT,
     PADDING_CARD,
+    STATUS_CRITICAL,
+    STATUS_HEALTHY,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
 )
@@ -115,7 +117,61 @@ def create_sensors_page() -> html.Div:
                                     "gap": "4px",
                                 },
                             ),
+                            html.Button(
+                                [
+                                    DashIconify(
+                                        icon="mdi:check-circle-outline",
+                                        width=16,
+                                        color="#FFFFFF",
+                                    ),
+                                    " Commission",
+                                ],
+                                id="sensors-commission-btn",
+                                n_clicks=0,
+                                style={
+                                    "padding": "8px 16px",
+                                    "background": STATUS_HEALTHY,
+                                    "color": "#FFFFFF",
+                                    "border": "none",
+                                    "borderRadius": "8px",
+                                    "fontSize": "13px",
+                                    "fontWeight": 500,
+                                    "cursor": "pointer",
+                                    "display": "flex",
+                                    "alignItems": "center",
+                                    "gap": "4px",
+                                },
+                            ),
+                            html.Button(
+                                [
+                                    DashIconify(
+                                        icon="mdi:delete-outline",
+                                        width=16,
+                                        color="#FFFFFF",
+                                    ),
+                                    " Remove",
+                                ],
+                                id="sensors-remove-btn",
+                                n_clicks=0,
+                                style={
+                                    "padding": "8px 16px",
+                                    "background": STATUS_CRITICAL,
+                                    "color": "#FFFFFF",
+                                    "border": "none",
+                                    "borderRadius": "8px",
+                                    "fontSize": "13px",
+                                    "fontWeight": 500,
+                                    "cursor": "pointer",
+                                    "display": "flex",
+                                    "alignItems": "center",
+                                    "gap": "4px",
+                                },
+                            ),
                         ],
+                        style={
+                            "display": "flex",
+                            "gap": "8px",
+                        },
                     ),
                 ],
                 style={
@@ -182,6 +238,50 @@ def create_sensors_page() -> html.Div:
         },
     )
 
+    # Edge Fusion panel
+    fusion_section = html.Div(
+        [
+            html.Div(
+                "Edge Fusion Pipeline",
+                style={
+                    "fontSize": "15px",
+                    "fontWeight": 600,
+                    "color": TEXT_PRIMARY,
+                    "marginBottom": "8px",
+                },
+            ),
+            html.P(
+                "Real-time sensor data fusion using Kalman filtering. "
+                "Shows current state estimates, uncertainty, and sensor "
+                "health per zone.",
+                style={
+                    "fontSize": "13px",
+                    "color": TEXT_SECONDARY,
+                    "lineHeight": "1.5",
+                    "marginBottom": "16px",
+                },
+            ),
+            html.Div(
+                id="sensors-fusion-content",
+                children=html.Span(
+                    "Select a zone to view fusion diagnostics",
+                    style={
+                        "fontSize": "13px",
+                        "color": TEXT_SECONDARY,
+                    },
+                ),
+            ),
+        ],
+        id="sensors-fusion-panel",
+        className="card",
+        style={
+            "padding": f"{PADDING_CARD}px",
+            "background": BG_CARD,
+            "borderRadius": CARD_RADIUS,
+            "boxShadow": CARD_SHADOW,
+        },
+    )
+
     # Confirmation dialogs
     confirm_remove = dcc.ConfirmDialog(
         id="sensors-remove-confirm",
@@ -199,12 +299,16 @@ def create_sensors_page() -> html.Div:
 
     # Stores
     sensor_action_store = dcc.Store(id="sensors-action-store", storage_type="memory")
+    selected_device_store = dcc.Store(
+        id="sensors-selected-device", storage_type="memory"
+    )
 
     return html.Div(
         [
             confirm_remove,
             confirm_commission,
             sensor_action_store,
+            selected_device_store,
             page_header,
             kpi_strip,
             html.Div(
@@ -212,6 +316,7 @@ def create_sensors_page() -> html.Div:
                     notifications_section,
                     inventory_section,
                     health_section,
+                    fusion_section,
                 ],
                 style={
                     "display": "flex",

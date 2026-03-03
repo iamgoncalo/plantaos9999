@@ -22,6 +22,7 @@ def register_3d_callbacks(app: object) -> None:
     _register_3d_fp_toggle(app)
     _register_3d_reset_camera(app)
     _register_3d_teleport(app)
+    _register_3d_auto_walk(app)
 
 
 def _register_3d_update(app: object) -> None:
@@ -53,7 +54,7 @@ def _register_3d_update(app: object) -> None:
             HTML string for the iframe srcdoc.
         """
         # Lazy-load: skip expensive 3D generation when not on 3D page
-        if pathname != "/building_3d":
+        if pathname not in ("/building_3d", "/building_3d_walk"):
             return no_update
 
         try:
@@ -162,5 +163,31 @@ def _register_3d_teleport(app: object) -> None:
         """,
         Output("3d-teleport-dropdown", "title"),
         Input("3d-teleport-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+
+
+def _register_3d_auto_walk(app: object) -> None:
+    """Auto-enter walk mode when navigating to /building_3d_walk."""
+
+    app.clientside_callback(
+        """
+        function(pathname) {
+            if (pathname !== "/building_3d_walk") {
+                return window.dash_clientside.no_update;
+            }
+            setTimeout(function() {
+                var iframe = document.getElementById("3d-viewer-iframe");
+                if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage(
+                        {type: "set-mode", mode: "walk"}, "*"
+                    );
+                }
+            }, 1500);
+            return "";
+        }
+        """,
+        Output("3d-fp-btn", "title", allow_duplicate=True),
+        Input("url", "pathname"),
         prevent_initial_call=True,
     )

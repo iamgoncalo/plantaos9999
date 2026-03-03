@@ -158,6 +158,62 @@ def render_floorplan_2d(
             fc = shape.get("fillcolor", "")
             if "rgba" in fc:
                 shape["fillcolor"] = fc.rsplit(",", 1)[0] + ", 0.65)"
+    if "people" in overlays:
+        # Show occupancy markers at zone centroids
+        for zone_id_p, polygon_p in zones_geom.items():
+            zd_p = zone_data.get(zone_id_p, {})
+            occ = int(zd_p.get("occupant_count", 0)) if isinstance(zd_p, dict) else 0
+            if occ > 0:
+                cx_p = sum(p[0] for p in polygon_p) / len(polygon_p)
+                cy_p = sum(p[1] for p in polygon_p) / len(polygon_p)
+                fig.add_trace(
+                    go.Scatter(
+                        x=[cx_p],
+                        y=[cy_p],
+                        mode="markers+text",
+                        marker=dict(
+                            size=max(10, min(30, occ)),
+                            color="rgba(0, 113, 227, 0.6)",
+                            symbol="circle",
+                        ),
+                        text=[str(occ)],
+                        textposition="middle center",
+                        textfont=dict(size=9, color="#FFFFFF", family=FONT_STACK),
+                        hoverinfo="skip",
+                        showlegend=False,
+                    )
+                )
+    if "flow" in overlays:
+        # Draw flow arrows between adjacent zones based on occupancy
+        centroids: dict[str, tuple[float, float]] = {}
+        for zone_id_f, polygon_f in zones_geom.items():
+            cx_f = sum(p[0] for p in polygon_f) / len(polygon_f)
+            cy_f = sum(p[1] for p in polygon_f) / len(polygon_f)
+            centroids[zone_id_f] = (cx_f, cy_f)
+        # Draw arrows from occupied zones to corridors
+        for zone_id_f in zones_geom:
+            zd_f = zone_data.get(zone_id_f, {})
+            occ_f = int(zd_f.get("occupant_count", 0)) if isinstance(zd_f, dict) else 0
+            if occ_f > 2 and zone_id_f in centroids:
+                src = centroids[zone_id_f]
+                corr = f"p{zone_id_f[1]}_circulacao"
+                if corr in centroids:
+                    dst = centroids[corr]
+                    fig.add_annotation(
+                        x=dst[0],
+                        y=dst[1],
+                        ax=src[0],
+                        ay=src[1],
+                        xref="x",
+                        yref="y",
+                        axref="x",
+                        ayref="y",
+                        showarrow=True,
+                        arrowhead=2,
+                        arrowsize=1.5,
+                        arrowwidth=max(1, occ_f // 3),
+                        arrowcolor="rgba(0, 113, 227, 0.4)",
+                    )
     if "alerts" in overlays:
         # Add warning markers at zones with low score
         for zone_id_a, polygon_a in zones_geom.items():

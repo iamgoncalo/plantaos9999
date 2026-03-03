@@ -97,7 +97,7 @@ def generate_3d_html(
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  html, body {{ width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }}
+  html, body {{ width: 100%; height: 100%; overflow: hidden; background: linear-gradient(180deg, #e0ecf5 0%, #f0f4f8 50%, #f8fafc 100%); }}
   canvas {{ display: block; }}
   #tooltip {{
     position: absolute;
@@ -168,7 +168,7 @@ def generate_3d_html(
 
   // -- Scene setup -----------------------------------------
   var scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xf8fafc, 80, 200);
+  scene.fog = new THREE.Fog(0xf0f4f8, 100, 250);
 
   var camera = new THREE.PerspectiveCamera(
     40, window.innerWidth / window.innerHeight, 0.5, 250
@@ -182,7 +182,7 @@ def generate_3d_html(
   }});
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0xf8fafc, 1);
+  renderer.setClearColor(0xf0f4f8, 1);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
@@ -257,7 +257,7 @@ def generate_3d_html(
   }});
 
   // -- Lighting --------------------------------------------
-  var ambient = new THREE.AmbientLight(0xffffff, 0.20);
+  var ambient = new THREE.AmbientLight(0xffffff, 0.45);
   scene.add(ambient);
 
   var dirLight = new THREE.DirectionalLight(0xffffff, 1.25);
@@ -280,7 +280,7 @@ def generate_3d_html(
   // -- Ground plane ----------------------------------------
   var groundGeo = new THREE.PlaneGeometry(100, 40);
   var groundMat = new THREE.MeshStandardMaterial({{
-    color: 0xeef1f5,
+    color: 0xc8ccd0,
     roughness: 0.95,
     metalness: 0.0
   }});
@@ -301,7 +301,7 @@ def generate_3d_html(
       {FLOOR_WIDTH_M + 2:.1f}, 0.12, {FLOOR_HEIGHT_M + 2:.1f}
     );
     var mat = new THREE.MeshStandardMaterial({{
-      color: 0xf0f2f5,
+      color: 0xe0e2e5,
       roughness: 0.8,
       metalness: 0.02,
       transparent: true,

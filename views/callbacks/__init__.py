@@ -7,7 +7,7 @@ organized by page/feature and imported here for centralized registration.
 
 from __future__ import annotations
 
-from dash import Input, Output, html
+from dash import Input, Output, State, html
 from dash_iconify import DashIconify
 from loguru import logger
 
@@ -29,6 +29,7 @@ from views.callbacks.view_2d_cb import register_view_2d_callbacks
 from views.callbacks.view_4d_cb import register_view_4d_callbacks
 from views.callbacks.view_data_cb import register_data_explorer_callbacks
 from views.callbacks.view_emergency_cb import register_emergency_callbacks
+from views.callbacks.view_context_cb import register_context_callbacks
 from views.callbacks.view_sensors_cb import register_sensor_coverage_callbacks
 
 # Optional callback modules (created by other agents)
@@ -71,6 +72,7 @@ _PAGE_TITLES: dict[str, str] = {
     "/booking": "Smart Booking",
     "/admin": "Settings",
     "/view_map": "Map Overlay",
+    "/view_context": "Context",
 }
 
 
@@ -102,6 +104,7 @@ def register_callbacks(app: object) -> None:
     register_data_explorer_callbacks(app)
     register_booking_callbacks(app)
     register_admin_callbacks(app)
+    register_context_callbacks(app)
     # Optional callback modules (created by other agents)
     if register_sensors_callbacks is not None:
         register_sensors_callbacks(app)
@@ -114,13 +117,16 @@ def register_callbacks(app: object) -> None:
 def _register_routing_callback(app: object) -> None:
     """Register the URL routing callback."""
 
+    _PROTECTED_PATHS = {"/reports", "/sensors", "/deployment"}
+
     @app.callback(
         Output("page-content", "children"),
         Output("header-title", "children"),
         Input("url", "pathname"),
+        State("auth-store", "data"),
     )
     @safe_callback
-    def route_page(pathname: str) -> tuple:
+    def route_page(pathname: str, auth_data: dict | None) -> tuple:
         """Route URL pathname to the correct page component."""
         try:
             from views.pages.admin import create_admin_page
@@ -138,6 +144,7 @@ def _register_routing_callback(app: object) -> None:
             from views.pages.view_4d import create_view_4d_page
             from views.pages.view_data import create_data_explorer_page
             from views.pages.view_emergency import create_emergency_page
+            from views.pages.view_context import create_context_page
             from views.pages.view_map import create_map_overlay_page
             from views.pages.view_sensors import create_sensor_coverage_page
 
@@ -177,6 +184,7 @@ def _register_routing_callback(app: object) -> None:
                 "/booking": create_booking_page,
                 "/admin": create_admin_page,
                 "/view_map": create_map_overlay_page,
+                "/view_context": create_context_page,
             }
 
             # Add optional pages if available
@@ -188,6 +196,54 @@ def _register_routing_callback(app: object) -> None:
                 page_map["/view_heatmap"] = create_heatmap_page
 
             title = _PAGE_TITLES.get(pathname, "Not Found")
+
+            # Auth gate: protected paths require login
+            if pathname in _PROTECTED_PATHS and not auth_data:
+                return html.Div(
+                    html.Div(
+                        [
+                            DashIconify(
+                                icon="mdi:lock-outline",
+                                width=48,
+                                color="#86868B",
+                            ),
+                            html.H2(
+                                "Authentication Required",
+                                style={
+                                    "margin": "16px 0 8px",
+                                    "fontSize": "20px",
+                                    "fontWeight": 600,
+                                },
+                            ),
+                            html.P(
+                                "Please log in via Settings to access this page.",
+                                style={
+                                    "color": "#6E6E73",
+                                    "marginBottom": "24px",
+                                },
+                            ),
+                            html.A(
+                                "Go to Settings",
+                                href="/admin",
+                                className="status-badge healthy",
+                                style={
+                                    "textDecoration": "none",
+                                    "padding": "8px 20px",
+                                    "fontSize": "14px",
+                                },
+                            ),
+                        ],
+                        className="card",
+                        style={
+                            "textAlign": "center",
+                            "padding": "48px",
+                            "maxWidth": "480px",
+                            "margin": "80px auto",
+                        },
+                    ),
+                    className="page-enter",
+                ), title
+
             creator = page_map.get(pathname)
 
             if creator:

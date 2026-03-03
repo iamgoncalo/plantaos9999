@@ -9,6 +9,8 @@ from __future__ import annotations
 from dash import dcc, html
 from dash_iconify import DashIconify
 
+from config.building import CFT_BUILDING
+
 
 def create_building_3d_page() -> html.Div:
     """Create the 3D building view page layout.
@@ -55,24 +57,73 @@ def create_building_3d_page() -> html.Div:
         n_clicks=0,
     )
 
+    # First Person toggle button
+    fp_btn = html.Button(
+        [
+            DashIconify(icon="mdi:walk", width=16),
+            " First Person",
+        ],
+        id="3d-fp-btn",
+        className="viewer-3d-reset-btn",
+        n_clicks=0,
+    )
+
+    # Reset camera position button (distinct from reset-btn)
+    reset_camera_btn = html.Button(
+        [
+            DashIconify(icon="mdi:restore", width=16),
+            " Reset Position",
+        ],
+        id="3d-reset-camera-btn",
+        className="viewer-3d-reset-btn",
+        n_clicks=0,
+    )
+
+    # Teleport to zone dropdown
+    zone_options = [
+        {"label": z.name, "value": z.id}
+        for z in CFT_BUILDING.all_zones
+        if z.capacity > 0
+    ]
+    teleport_dropdown = dcc.Dropdown(
+        id="3d-teleport-dropdown",
+        options=zone_options,
+        placeholder="Teleport to zone...",
+        clearable=True,
+        className="viewer-3d-teleport-dd",
+        style={
+            "width": "180px",
+            "fontSize": "13px",
+        },
+    )
+
     # Controls overlay (positioned absolute over the iframe)
     controls = html.Div(
         [
             html.Div(
                 [
-                    html.Div("Metric", className="viewer-3d-control-label"),
+                    html.Div(
+                        "Metric",
+                        className="viewer-3d-control-label",
+                    ),
                     metric_selector,
                 ],
                 className="viewer-3d-control-group",
             ),
             html.Div(
                 [
-                    html.Div("Floor", className="viewer-3d-control-label"),
+                    html.Div(
+                        "Floor",
+                        className="viewer-3d-control-label",
+                    ),
                     floor_selector,
                 ],
                 className="viewer-3d-control-group",
             ),
             reset_btn,
+            fp_btn,
+            reset_camera_btn,
+            teleport_dropdown,
         ],
         className="viewer-3d-controls",
     )

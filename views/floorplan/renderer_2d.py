@@ -67,6 +67,8 @@ def render_floorplan_2d(
     zone_data: dict[str, dict[str, Any]] | None = None,
     selected_zone: str | None = None,
     metric: str = "freedom_index",
+    avatar_pos: dict | None = None,
+    overlays: list[str] | None = None,
 ) -> go.Figure:
     """Render a 2D floorplan with zone color overlays.
 
@@ -75,6 +77,8 @@ def render_floorplan_2d(
         zone_data: Dict mapping zone_id to dict with metric values.
         selected_zone: Zone to highlight with selection border.
         metric: Which metric the values represent.
+        avatar_pos: Optional dict with x, y keys for avatar marker.
+        overlays: Optional list of overlay names ("heat", "alerts").
 
     Returns:
         Plotly Figure with the floorplan.
@@ -125,6 +129,65 @@ def render_floorplan_2d(
             dots = _create_occupancy_dots(zone_id, polygon, occ, dot_color)
             if dots is not None:
                 fig.add_trace(dots)
+
+    # Avatar marker
+    if avatar_pos:
+        ax, ay = avatar_pos.get("x", 15), avatar_pos.get("y", 9)
+        fig.add_trace(
+            go.Scatter(
+                x=[ax],
+                y=[ay],
+                mode="markers",
+                marker=dict(
+                    size=14,
+                    color="#0071E3",
+                    symbol="circle",
+                    line=dict(color="#FFFFFF", width=2),
+                ),
+                hoverinfo="skip",
+                showlegend=False,
+                name="avatar",
+            )
+        )
+
+    # Overlay logic
+    overlays = overlays or []
+    if "heat" in overlays:
+        # Increase zone fill opacity via shape update
+        for shape in shapes:
+            fc = shape.get("fillcolor", "")
+            if "rgba" in fc:
+                shape["fillcolor"] = fc.rsplit(",", 1)[0] + ", 0.65)"
+    if "alerts" in overlays:
+        # Add warning markers at zones with low score
+        for zone_id_a, polygon_a in zones_geom.items():
+            zd_a = zone_data.get(zone_id_a, {})
+            score_a = (
+                zd_a.get("freedom_index", 50.0)
+                if isinstance(zd_a, dict)
+                else float(zd_a)
+            )
+            if score_a < 40:
+                cx_a = sum(p[0] for p in polygon_a) / len(polygon_a)
+                cy_a = sum(p[1] for p in polygon_a) / len(polygon_a)
+                fig.add_trace(
+                    go.Scatter(
+                        x=[cx_a],
+                        y=[cy_a + 0.8],
+                        mode="markers+text",
+                        marker=dict(
+                            size=18,
+                            color=STATUS_WARNING,
+                            symbol="triangle-up",
+                            line=dict(color="#FFFFFF", width=1),
+                        ),
+                        text=["!"],
+                        textposition="middle center",
+                        textfont=dict(size=9, color="#FFFFFF", family=FONT_STACK),
+                        hoverinfo="skip",
+                        showlegend=False,
+                    )
+                )
 
     # Color legend
     fig.add_trace(_create_color_legend())

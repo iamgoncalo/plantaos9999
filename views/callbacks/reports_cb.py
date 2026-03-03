@@ -187,7 +187,7 @@ def _register_breakdown_pie(app: object) -> None:
 
         except Exception as e:
             logger.warning(f"Reports breakdown pie error: {e}")
-            return empty_chart("Error loading chart")
+            return empty_chart("Aguardando dados...")
 
 
 def _register_trend_line(app: object) -> None:
@@ -210,6 +210,12 @@ def _register_trend_line(app: object) -> None:
 
             if energy_df is None or energy_df.empty:
                 return empty_chart("No energy data for this period")
+
+            # Column existence checks
+            if "timestamp" not in energy_df.columns:
+                return empty_chart("Missing timestamp column")
+            if "total_kwh" not in energy_df.columns:
+                return empty_chart("Missing total_kwh column")
 
             cfg = DEFAULT_AFI_CONFIG
 
@@ -236,7 +242,7 @@ def _register_trend_line(app: object) -> None:
                     name="Daily Cost",
                     line=dict(color=ACCENT_BLUE, width=2),
                     marker=dict(size=6),
-                    hovertemplate="€%{y:.2f}<br>%{x}<extra></extra>",
+                    hovertemplate="\u20ac%{y:.2f}<br>%{x}<extra></extra>",
                 )
             )
 
@@ -247,16 +253,16 @@ def _register_trend_line(app: object) -> None:
                     y=avg_cost,
                     line_dash="dash",
                     line_color=STATUS_WARNING,
-                    annotation_text=f"Avg: €{avg_cost:.2f}",
+                    annotation_text=f"Avg: \u20ac{avg_cost:.2f}",
                     annotation_position="top right",
                 )
 
-            fig.update_yaxes(title_text="Cost (€)")
-            return apply_chart_theme(fig, "Daily Cost Trend (€)")
+            fig.update_yaxes(title_text="Cost (\u20ac)")
+            return apply_chart_theme(fig, "Daily Cost Trend (\u20ac)")
 
         except Exception as e:
             logger.warning(f"Reports trend line error: {e}")
-            return empty_chart("Error loading chart")
+            return empty_chart("Aguardando dados...")
 
 
 def _register_zone_ranking(app: object) -> None:
@@ -280,8 +286,11 @@ def _register_zone_ranking(app: object) -> None:
 
             zone_costs: list[dict[str, object]] = []
             for zone in zones:
-                bleed = compute_financial_bleed(zone.id)
-                total = bleed.total_bleed_eur_hr * hours
+                try:
+                    bleed = compute_financial_bleed(zone.id)
+                    total = bleed.total_bleed_eur_hr * hours
+                except Exception:
+                    total = 0.0
                 zone_obj = get_zone_by_id(zone.id)
                 name = zone_obj.name if zone_obj else zone.id
                 zone_costs.append({"name": name, "cost": total})
@@ -302,16 +311,16 @@ def _register_zone_ranking(app: object) -> None:
                     y=names,
                     orientation="h",
                     marker=dict(color=ACCENT_BLUE),
-                    hovertemplate="%{y}<br>€%{x:.2f}<extra></extra>",
+                    hovertemplate="%{y}<br>\u20ac%{x:.2f}<extra></extra>",
                 )
             )
 
-            fig.update_xaxes(title_text="Total Cost (€)")
+            fig.update_xaxes(title_text="Total Cost (\u20ac)")
             return apply_chart_theme(fig, "Cost by Zone (Top 10)", height=420)
 
         except Exception as e:
             logger.warning(f"Reports zone ranking error: {e}")
-            return empty_chart("Error loading chart")
+            return empty_chart("Aguardando dados...")
 
 
 def _register_savings_chart(app: object) -> None:
@@ -333,7 +342,13 @@ def _register_savings_chart(app: object) -> None:
             energy_df = store.get_time_range("energy", start, end)
 
             if energy_df is None or energy_df.empty:
-                return empty_chart("No energy data for savings comparison")
+                return empty_chart("Aguardando dados...")
+
+            # Column existence checks
+            if "timestamp" not in energy_df.columns:
+                return empty_chart("Missing timestamp column")
+            if "total_kwh" not in energy_df.columns:
+                return empty_chart("Missing total_kwh column")
 
             cfg = DEFAULT_AFI_CONFIG
             energy_df = energy_df.copy()
@@ -359,7 +374,7 @@ def _register_savings_chart(app: object) -> None:
                     y=daily["baseline_cost"],
                     name="Baseline",
                     marker=dict(color=STATUS_WARNING, opacity=0.5),
-                    hovertemplate="Baseline: €%{y:.2f}<extra></extra>",
+                    hovertemplate="Baseline: \u20ac%{y:.2f}<extra></extra>",
                 )
             )
 
@@ -369,17 +384,17 @@ def _register_savings_chart(app: object) -> None:
                     y=daily["actual_cost"],
                     name="Actual",
                     marker=dict(color=ACCENT_BLUE),
-                    hovertemplate="Actual: €%{y:.2f}<extra></extra>",
+                    hovertemplate="Actual: \u20ac%{y:.2f}<extra></extra>",
                 )
             )
 
             fig.update_layout(barmode="group")
-            fig.update_yaxes(title_text="Cost (€)")
+            fig.update_yaxes(title_text="Cost (\u20ac)")
             return apply_chart_theme(fig, "Savings vs. Baseline")
 
         except Exception as e:
             logger.warning(f"Reports savings chart error: {e}")
-            return empty_chart("Error loading chart")
+            return empty_chart("Aguardando dados...")
 
 
 def _register_pdf_download(app: object) -> None:

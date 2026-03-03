@@ -1,21 +1,20 @@
 """Callbacks for the standalone 2D floorplan view page.
 
-Wires building-state-store, metric selector, and floor selector
-to the 2D floorplan graph. Includes keyboard navigation (Pokemon Mode)
-using arrow keys to move between zones via zone adjacency and centroids.
+Wires building-state-store, metric selector, floor selector, avatar
+position, and overlay selector to the 2D floorplan graph. Includes
+smooth WASD/arrow-key avatar movement with collision detection via
+clientside callbacks.
 """
 
 from __future__ import annotations
 
-import math
-
 from dash import Input, Output, State, html, no_update
 from loguru import logger
 
+from core.geometry import FLOOR_0_WALKABLE, FLOOR_1_WALKABLE
 from views.components.safe_callback import safe_callback
 from views.floorplan.renderer_2d import render_floorplan_2d
 from views.floorplan.zones_geometry import (
-    get_zone_center,
     get_zones_for_floor,
 )
 
@@ -27,12 +26,16 @@ def register_view_2d_callbacks(app: object) -> None:
         app: The Dash application instance.
     """
     _register_floorplan_update(app)
-    _register_keyboard_nav(app)
+    _register_keyboard_setup(app)
+    _register_key_poll(app)
+    _register_walkable_update(app)
+    _register_overlay_sync(app)
+    _register_zone_auto_select(app)
     _register_zone_detail(app)
 
 
 def _register_floorplan_update(app: object) -> None:
-    """Update the 2D floorplan when state, metric, floor, or selection changes."""
+    """Update the 2D floorplan when state, metric, floor, selection, or avatar changes."""
 
     @app.callback(
         Output("view2d-floorplan-graph", "figure"),
@@ -40,6 +43,8 @@ def _register_floorplan_update(app: object) -> None:
         Input("view2d-metric-selector", "value"),
         Input("view2d-floor-selector", "value"),
         Input("view2d-selected-zone", "data"),
+        Input("view2d-avatar-pos", "data"),
+        Input("view2d-overlays", "data"),
         State("url", "pathname"),
     )
     @safe_callback
@@ -48,6 +53,8 @@ def _register_floorplan_update(app: object) -> None:
         metric: str | None,
         floor_value: str | None,
         selected_zone: str | None,
+        avatar_pos: dict | None,
+        overlays: list[str] | None,
         pathname: str | None,
     ) -> object:
         """Regenerate the 2D floorplan from current building state."""
@@ -80,58 +87,129 @@ def _register_floorplan_update(app: object) -> None:
                 zone_data=zone_data,
                 metric=metric,
                 selected_zone=selected_zone,
+                avatar_pos=avatar_pos,
+                overlays=overlays,
             )
         except Exception as e:
             logger.warning(f"2D floorplan view callback error: {e}")
             return no_update
 
 
-def _register_keyboard_nav(app: object) -> None:
-    """Keyboard navigation: arrow keys + click to select/move between zones."""
+def _register_keyboard_setup(app: object) -> None:
+    """Set up keydown/keyup listeners on page load via clientside callback."""
 
-    # Clientside callback for capturing keyboard events
     app.clientside_callback(
         """
-        function(n) {
-            // Set up keyboard listener on mount
-            if (!window._view2dKeyHandler) {
-                window._view2dKeyHandler = function(e) {
-                    var keyMap = {
-                        'ArrowUp': 'up', 'ArrowDown': 'down',
-                        'ArrowLeft': 'left', 'ArrowRight': 'right',
-                        'w': 'up', 's': 'down', 'a': 'left', 'd': 'right'
-                    };
-                    var dir = keyMap[e.key];
-                    if (dir) {
+        function(pathname) {
+            if (pathname !== '/view_2d') return window.dash_clientside.no_update;
+            if (!window._view2dKeysDown) {
+                window._view2dKeysDown = {};
+                document.addEventListener('keydown', function(e) {
+                    var validKeys = [
+                        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+                        'KeyW', 'KeyA', 'KeyS', 'KeyD'
+                    ];
+                    if (validKeys.indexOf(e.code) !== -1) {
                         e.preventDefault();
-                        var store = document.getElementById('view2d-keyboard-event');
-                        if (store && store._dashprivate_value !== undefined) {
-                            // Trigger via store update
-                        }
-                        window._view2dLastKey = dir;
-                        window._view2dKeyTs = Date.now();
-                        // Force dash callback by updating store
-                        var el = document.querySelector('[data-dash-is-loading]');
+                        window._view2dKeysDown[e.code] = true;
                     }
-                };
-                document.addEventListener('keydown', window._view2dKeyHandler);
-            }
-            // Return current key event
-            if (window._view2dLastKey && window._view2dKeyTs) {
-                var result = {direction: window._view2dLastKey, ts: window._view2dKeyTs};
-                window._view2dLastKey = null;
-                return result;
+                });
+                document.addEventListener('keyup', function(e) {
+                    if (window._view2dKeysDown[e.code] !== undefined) {
+                        delete window._view2dKeysDown[e.code];
+                    }
+                });
             }
             return window.dash_clientside.no_update;
         }
         """,
         Output("view2d-keyboard-event", "data"),
-        Input("data-refresh-interval", "n_intervals"),
+        Input("url", "pathname"),
     )
+
+
+def _register_key_poll(app: object) -> None:
+    """Poll held keys on interval and move avatar with collision check."""
+
+    app.clientside_callback(
+        """
+        function(n, pos, polys) {
+            var keys = window._view2dKeysDown || {};
+            var x = pos.x, y = pos.y;
+            var speed = 0.5;
+            var moved = false;
+            if (keys['ArrowUp'] || keys['KeyW']) { y += speed; moved = true; }
+            if (keys['ArrowDown'] || keys['KeyS']) { y -= speed; moved = true; }
+            if (keys['ArrowLeft'] || keys['KeyA']) { x -= speed; moved = true; }
+            if (keys['ArrowRight'] || keys['KeyD']) { x += speed; moved = true; }
+            if (!moved) return window.dash_clientside.no_update;
+            function pip(px, py, poly) {
+                var inside = false;
+                for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                    var xi = poly[i][0], yi = poly[i][1];
+                    var xj = poly[j][0], yj = poly[j][1];
+                    if ((yi > py) !== (yj > py) &&
+                        px < (xj - xi) * (py - yi) / (yj - yi) + xi)
+                        inside = !inside;
+                }
+                return inside;
+            }
+            var walkable = false;
+            for (var k = 0; k < polys.length; k++) {
+                if (pip(x, y, polys[k])) { walkable = true; break; }
+            }
+            if (!walkable) return window.dash_clientside.no_update;
+            return {x: x, y: y};
+        }
+        """,
+        Output("view2d-avatar-pos", "data"),
+        Input("view2d-key-poll", "n_intervals"),
+        State("view2d-avatar-pos", "data"),
+        State("view2d-walkable-polys", "data"),
+    )
+
+
+def _register_walkable_update(app: object) -> None:
+    """Update walkable polygons when floor changes."""
+
+    @app.callback(
+        Output("view2d-walkable-polys", "data"),
+        Input("view2d-floor-selector", "value"),
+        State("url", "pathname"),
+    )
+    @safe_callback
+    def update_walkable_polys(
+        floor_value: str | None,
+        pathname: str | None,
+    ) -> object:
+        """Return walkable polygons for the selected floor."""
+        if pathname != "/view_2d":
+            return no_update
+        floor = int(floor_value) if floor_value is not None else 0
+        return FLOOR_0_WALKABLE if floor == 0 else FLOOR_1_WALKABLE
+
+
+def _register_overlay_sync(app: object) -> None:
+    """Sync overlay selector value to overlays store."""
+
+    app.clientside_callback(
+        """
+        function(value) {
+            if (!value || value === 'none') return [];
+            return [value];
+        }
+        """,
+        Output("view2d-overlays", "data"),
+        Input("view2d-overlay-selector", "value"),
+    )
+
+
+def _register_zone_auto_select(app: object) -> None:
+    """Auto-select zone when avatar enters it."""
 
     @app.callback(
         Output("view2d-selected-zone", "data"),
-        Input("view2d-keyboard-event", "data"),
+        Input("view2d-avatar-pos", "data"),
         Input("view2d-floorplan-graph", "clickData"),
         State("view2d-selected-zone", "data"),
         State("view2d-floor-selector", "value"),
@@ -139,14 +217,14 @@ def _register_keyboard_nav(app: object) -> None:
         prevent_initial_call=True,
     )
     @safe_callback
-    def navigate_zone(
-        key_event: dict | None,
+    def auto_select_zone(
+        avatar_pos: dict | None,
         click_data: dict | None,
         current_zone: str | None,
         floor_value: str | None,
         pathname: str | None,
     ) -> str | None:
-        """Move zone selection based on keyboard or click events."""
+        """Select zone based on avatar position or click."""
         if pathname != "/view_2d":
             return no_update
 
@@ -165,53 +243,22 @@ def _register_keyboard_nav(app: object) -> None:
                         return zone_id
             return no_update
 
-        # Handle keyboard navigation
-        if triggered == "view2d-keyboard-event" and key_event:
-            direction = key_event.get("direction")
-            if not direction:
-                return no_update
+        # Handle avatar position — find which zone the avatar is in
+        if triggered == "view2d-avatar-pos" and avatar_pos:
+            from core.geometry import point_in_polygon
 
+            ax = avatar_pos.get("x", 0)
+            ay = avatar_pos.get("y", 0)
             floor = int(floor_value) if floor_value is not None else 0
             zones = get_zones_for_floor(floor)
-            zone_ids = [z.id for z in zones if z.capacity > 0]
 
-            if not zone_ids:
-                return no_update
-
-            # If no zone selected, pick the first one
-            if not current_zone or current_zone not in zone_ids:
-                return zone_ids[0]
-
-            # Find nearest zone in the given direction
-            cx, cy = get_zone_center(current_zone)
-            best_id = None
-            best_dist = float("inf")
-
-            for zid in zone_ids:
-                if zid == current_zone:
-                    continue
-                zx, zy = get_zone_center(zid)
-                dx = zx - cx
-                dy = zy - cy
-
-                # Check direction match
-                match = False
-                if direction == "right" and dx > 0.5:
-                    match = True
-                elif direction == "left" and dx < -0.5:
-                    match = True
-                elif direction == "up" and dy > 0.5:
-                    match = True
-                elif direction == "down" and dy < -0.5:
-                    match = True
-
-                if match:
-                    dist = math.sqrt(dx * dx + dy * dy)
-                    if dist < best_dist:
-                        best_dist = dist
-                        best_id = zid
-
-            return best_id if best_id else no_update
+            for z in zones:
+                pts = z.points
+                if point_in_polygon(ax, ay, pts):
+                    if z.id != current_zone:
+                        return z.id
+                    return no_update
+            return no_update
 
         return no_update
 
@@ -336,7 +383,7 @@ def _register_zone_detail(app: object) -> None:
                 ),
                 _metric_row(
                     "mdi:molecule-co2",
-                    "CO₂",
+                    "CO2",
                     f"{co2:.0f} ppm" if co2 else "—",
                 ),
                 _metric_row(

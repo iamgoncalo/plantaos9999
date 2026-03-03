@@ -136,6 +136,29 @@ def create_sensors_page() -> html.Div:
         },
     )
 
+    # Health notifications panel
+    notifications_section = html.Div(
+        [
+            html.Div(
+                "Health Notifications",
+                style={
+                    "fontSize": "15px",
+                    "fontWeight": 600,
+                    "color": TEXT_PRIMARY,
+                    "marginBottom": "12px",
+                },
+            ),
+            html.Div(id="sensors-health-notifications"),
+        ],
+        className="card",
+        style={
+            "padding": f"{PADDING_CARD}px",
+            "background": BG_CARD,
+            "borderRadius": CARD_RADIUS,
+            "boxShadow": CARD_SHADOW,
+        },
+    )
+
     # Sensor health panel
     health_section = html.Div(
         [
@@ -185,7 +208,11 @@ def create_sensors_page() -> html.Div:
             page_header,
             kpi_strip,
             html.Div(
-                [inventory_section, health_section],
+                [
+                    notifications_section,
+                    inventory_section,
+                    health_section,
+                ],
                 style={
                     "display": "flex",
                     "flexDirection": "column",

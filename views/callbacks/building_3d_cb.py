@@ -19,6 +19,9 @@ def register_3d_callbacks(app: object) -> None:
         app: The Dash application instance.
     """
     _register_3d_update(app)
+    _register_3d_fp_toggle(app)
+    _register_3d_reset_camera(app)
+    _register_3d_teleport(app)
 
 
 def _register_3d_update(app: object) -> None:
@@ -95,3 +98,69 @@ def _register_3d_update(app: object) -> None:
         except Exception as e:
             logger.warning(f"3D view callback error: {e}")
             return no_update
+
+
+def _register_3d_fp_toggle(app: object) -> None:
+    """Send first-person mode postMessage to 3D iframe."""
+
+    app.clientside_callback(
+        """
+        function(n_clicks) {
+            if (!n_clicks) return window.dash_clientside.no_update;
+            var iframe = document.getElementById("3d-viewer-iframe");
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage(
+                    {type: "set-mode", mode: "walk"}, "*"
+                );
+            }
+            return "";
+        }
+        """,
+        Output("3d-fp-btn", "title"),
+        Input("3d-fp-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+
+
+def _register_3d_reset_camera(app: object) -> None:
+    """Send reset-camera postMessage to 3D iframe."""
+
+    app.clientside_callback(
+        """
+        function(n_clicks) {
+            if (!n_clicks) return window.dash_clientside.no_update;
+            var iframe = document.getElementById("3d-viewer-iframe");
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage(
+                    {type: "reset-camera"}, "*"
+                );
+            }
+            return "";
+        }
+        """,
+        Output("3d-reset-camera-btn", "title"),
+        Input("3d-reset-camera-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+
+
+def _register_3d_teleport(app: object) -> None:
+    """Send teleport postMessage to 3D iframe when zone selected."""
+
+    app.clientside_callback(
+        """
+        function(value) {
+            if (!value) return window.dash_clientside.no_update;
+            var iframe = document.getElementById("3d-viewer-iframe");
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage(
+                    {type: "teleport", zoneId: value}, "*"
+                );
+            }
+            return "";
+        }
+        """,
+        Output("3d-teleport-dropdown", "title"),
+        Input("3d-teleport-dropdown", "value"),
+        prevent_initial_call=True,
+    )

@@ -186,6 +186,9 @@ def generate_3d_html(
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.physicallyCorrectLights = true;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
   document.body.appendChild(renderer.domElement);
 
   // -- Controls --------------------------------------------
@@ -254,11 +257,11 @@ def generate_3d_html(
   }});
 
   // -- Lighting --------------------------------------------
-  var ambient = new THREE.AmbientLight(0xffffff, 0.55);
+  var ambient = new THREE.AmbientLight(0xffffff, 0.20);
   scene.add(ambient);
 
-  var dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
-  dirLight.position.set(45, 50, 30);
+  var dirLight = new THREE.DirectionalLight(0xffffff, 1.25);
+  dirLight.position.set(12, 18, 10);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.set(2048, 2048);
   dirLight.shadow.camera.left = -60;
@@ -271,7 +274,7 @@ def generate_3d_html(
   dirLight.shadow.radius = 4;
   scene.add(dirLight);
 
-  var hemiLight = new THREE.HemisphereLight(0xddeeff, 0xffeedd, 0.25);
+  var hemiLight = new THREE.HemisphereLight(0xffffff, 0xcfcfcf, 0.55);
   scene.add(hemiLight);
 
   // -- Ground plane ----------------------------------------
@@ -337,7 +340,7 @@ def generate_3d_html(
     var color = hexToThreeColor(colorHex);
     var mat = new THREE.MeshStandardMaterial({{
       color: color,
-      roughness: 0.6,
+      roughness: 0.85,
       metalness: 0.05,
       transparent: true,
       opacity: opacity
@@ -378,30 +381,30 @@ def generate_3d_html(
       cz /= points.length;
 
       var canvas = document.createElement("canvas");
-      canvas.width = 256;
-      canvas.height = 64;
+      canvas.width = 160;
+      canvas.height = 48;
       var ctx = canvas.getContext("2d");
 
       ctx.fillStyle = "rgba(255,255,255,0.85)";
-      var radius = 10;
+      var radius = 8;
       ctx.beginPath();
       ctx.moveTo(radius, 2);
-      ctx.lineTo(254 - radius, 2);
-      ctx.quadraticCurveTo(254, 2, 254, 2 + radius);
-      ctx.lineTo(254, 62 - radius);
-      ctx.quadraticCurveTo(254, 62, 254 - radius, 62);
-      ctx.lineTo(radius, 62);
-      ctx.quadraticCurveTo(2, 62, 2, 62 - radius);
+      ctx.lineTo(158 - radius, 2);
+      ctx.quadraticCurveTo(158, 2, 158, 2 + radius);
+      ctx.lineTo(158, 46 - radius);
+      ctx.quadraticCurveTo(158, 46, 158 - radius, 46);
+      ctx.lineTo(radius, 46);
+      ctx.quadraticCurveTo(2, 46, 2, 46 - radius);
       ctx.lineTo(2, 2 + radius);
       ctx.quadraticCurveTo(2, 2, radius, 2);
       ctx.closePath();
       ctx.fill();
 
-      ctx.font = "bold 22px Inter, -apple-system, sans-serif";
+      ctx.font = "bold 16px Inter, -apple-system, sans-serif";
       ctx.fillStyle = "#1D1D1F";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(name, 128, 32);
+      ctx.fillText(name, 80, 24);
 
       var tex = new THREE.CanvasTexture(canvas);
       tex.minFilter = THREE.LinearFilter;
@@ -412,7 +415,7 @@ def generate_3d_html(
       }});
       var sprite = new THREE.Sprite(spriteMat);
       sprite.position.set(cx, yBase + wallHeight + 0.6, cz);
-      sprite.scale.set(3.5, 0.875, 1);
+      sprite.scale.set(2.2, 0.66, 1);
       scene.add(sprite);
       labelSprites.push(sprite);
     }}
@@ -547,13 +550,21 @@ def generate_3d_html(
       direction.normalize();
       if (moveForward || moveBackward) velocity.z -= direction.z * 25.0 * delta;
       if (moveLeft || moveRight) velocity.x -= direction.x * 25.0 * delta;
+      // Save pre-move position for collision rollback
+      var prevX = camera.position.x;
+      var prevZ = camera.position.z;
       fpControls.moveRight(-velocity.x * delta);
       fpControls.moveForward(-velocity.z * delta);
+      // AABB collision against building bounds
+      var R = 0.3;
+      var nx = camera.position.x;
+      var nz = camera.position.z;
+      if (nx - R < 0 || nx + R > {FLOOR_WIDTH_M}) nx = prevX;
+      if (nz - R < 0 || nz + R > {FLOOR_HEIGHT_M}) nz = prevZ;
+      camera.position.x = nx;
+      camera.position.z = nz;
       // Clamp Y to eye level
       camera.position.y = 1.6;
-      // Clamp to building bounds
-      camera.position.x = Math.max(0, Math.min(camera.position.x, {FLOOR_WIDTH_M}));
-      camera.position.z = Math.max(0, Math.min(camera.position.z, {FLOOR_HEIGHT_M}));
       prevTime = time;
     }} else {{
       controls.update();
@@ -564,10 +575,77 @@ def generate_3d_html(
 
   // -- Public API for reset camera -------------------------
   window.resetCamera = function() {{
+    if (isFPS) {{ fpControls.unlock(); }}
     camera.position.set(60, 35, 40);
     controls.target.set({cam_target_x:.1f}, {cam_target_y:.1f}, {cam_target_z:.1f});
     controls.update();
   }};
+
+  // -- Teleport to zone by ID ----------------------------
+  window.teleportToZone = function(zoneId) {{
+    for (var i = 0; i < zoneMeshes.length; i++) {{
+      if (zoneMeshes[i].userData.zoneId === zoneId) {{
+        var mesh = zoneMeshes[i];
+        var box = new THREE.Box3().setFromObject(mesh);
+        var center = box.getCenter(new THREE.Vector3());
+        if (isFPS) {{
+          camera.position.set(center.x, 1.6, center.z);
+        }} else {{
+          camera.position.set(
+            center.x + 15, center.y + 12, center.z + 15
+          );
+          controls.target.copy(center);
+          controls.update();
+        }}
+        break;
+      }}
+    }}
+  }};
+
+  // -- People billboard markers ----------------------------
+  window.addPeopleMarker = function(x, y, z, count) {{
+    var canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "rgba(0,113,227,0.85)";
+    ctx.beginPath();
+    ctx.arc(32, 32, 28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = "bold 22px Inter, sans-serif";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(count), 32, 32);
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    var mat = new THREE.SpriteMaterial({{
+      map: tex, transparent: true, depthTest: false
+    }});
+    var sprite = new THREE.Sprite(mat);
+    sprite.position.set(x, y, z);
+    sprite.scale.set(1.2, 1.2, 1);
+    scene.add(sprite);
+    return sprite;
+  }};
+
+  // -- PostMessage receiver from parent Dash ----------------
+  window.addEventListener("message", function(event) {{
+    var msg = event.data;
+    if (!msg || !msg.type) return;
+    if (msg.type === "reset-camera") {{
+      window.resetCamera();
+    }} else if (msg.type === "set-mode") {{
+      if (msg.mode === "walk") {{
+        camera.position.set(5, 1.6, 7.5);
+        fpControls.lock();
+      }} else {{
+        fpControls.unlock();
+      }}
+    }} else if (msg.type === "teleport") {{
+      window.teleportToZone(msg.zoneId);
+    }}
+  }});
 
 }})();
 </script>

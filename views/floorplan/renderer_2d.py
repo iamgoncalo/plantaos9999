@@ -37,27 +37,32 @@ _NAME_SHORT: dict[str, str] = {
     "Sala Multiusos": "Multiusos",
     "Biblioteca / Espolio HORSE": "Biblioteca",
     "Zona Social / Copa": "Copa",
-    "Sala Formacao 1": "Form. 1",
-    "Sala Formacao 2": "Form. 2",
-    "Sala Formacao 3": "Form. 3",
+    "Sala Formacao": "Formacao",
     "Sala Reuniao": "Reuniao",
     "Sala Informatica": "Informatica",
-    "Exibicao Armazem": "Armazem",
     "Sala Dojo Seguranca": "Dojo",
-    "Sala Grande": "Sala Grande",
-    "Sala Pequena": "Sala Peq.",
+    "Sala Reunioes": "Reunioes",
+    "Sala A": "Sala A",
+    "Sala B": "Sala B",
+    "Sala C": "Sala C",
+    "Sala D": "Sala D",
+    "Recepcao": "Recepcao",
+    "Auditorio": "Auditorio",
+    "Arrumos": "Arrumos",
 }
 
 # Team-color mapping: zone type → dot color for occupancy visualization
 _ZONE_TEAM_COLORS: dict[str, str] = {
     "p0_informatica": "#5856D6",  # Engineering (purple)
     "p1_dojo": STATUS_CRITICAL,  # Safety (red)
-    "p0_formacao1": STATUS_HEALTHY,  # Training (green)
-    "p0_formacao2": STATUS_HEALTHY,
-    "p0_formacao3": STATUS_HEALTHY,
+    "p0_sala": STATUS_HEALTHY,  # Training (green)
+    "p0_auditorio": STATUS_HEALTHY,
     "p0_reuniao": "#5856D6",  # Management (purple)
-    "p1_salagrande": "#5856D6",
-    "p1_salapequena": "#5856D6",
+    "p1_sala_a": STATUS_HEALTHY,
+    "p1_sala_b": STATUS_HEALTHY,
+    "p1_sala_c": STATUS_HEALTHY,
+    "p1_sala_d": STATUS_HEALTHY,
+    "p1_reunioes": "#5856D6",
 }
 
 

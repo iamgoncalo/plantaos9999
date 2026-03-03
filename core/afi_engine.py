@@ -32,9 +32,39 @@ from data.store import store
 # ═══════════════════════════════════════════════
 # Realistic Financial Caps
 # ═══════════════════════════════════════════════
-# ~800m² building, €3000/month ÷ 720hrs ≈ €4.17/hr
+# ~500m² building, €3000/month ÷ 720hrs ≈ €4.17/hr
 MAX_BUILDING_BLEED_EUR_HR = 8.0  # generous cap with margin
 MAX_ZONE_BLEED_EUR_HR = 3.0  # no single zone exceeds this
+
+# ═══════════════════════════════════════════════
+# EMA (Exponential Moving Average) Smoothing
+# ═══════════════════════════════════════════════
+EMA_ALPHA = 0.3  # Smoothing factor (0.3 = responsive yet stable)
+_ema_state: dict[str, dict[str, float]] = {}  # zone_id → {metric: ema_value}
+
+
+def _ema_smooth(zone_id: str, metric: str, new_value: float) -> float:
+    """Apply EMA smoothing to a metric value for smooth data drift.
+
+    EMA(t) = α · X(t) + (1 - α) · EMA(t-1)
+
+    Args:
+        zone_id: Zone identifier.
+        metric: Metric name (e.g., 'freedom', 'bleed').
+        new_value: New raw value.
+
+    Returns:
+        Smoothed value.
+    """
+    if zone_id not in _ema_state:
+        _ema_state[zone_id] = {}
+    prev = _ema_state[zone_id].get(metric)
+    if prev is None:
+        _ema_state[zone_id][metric] = new_value
+        return new_value
+    smoothed = EMA_ALPHA * new_value + (1 - EMA_ALPHA) * prev
+    _ema_state[zone_id][metric] = smoothed
+    return smoothed
 
 
 # ═══════════════════════════════════════════════
@@ -123,32 +153,45 @@ class BuildingAFI(BaseModel):
 # Zone Adjacency Graph (computed from geometry)
 # ═══════════════════════════════════════════════
 
-# Number of exits/adjacent zones per zone (from DWG analysis)
+# Number of exits/adjacent zones per zone (from geometry analysis)
 _ZONE_ADJACENCY: dict[str, list[str]] = {
     "p0_multiusos": ["p0_circulacao", "p0_biblioteca"],
-    "p0_biblioteca": ["p0_multiusos", "p0_circulacao", "p0_copa"],
-    "p0_copa": ["p0_biblioteca", "p0_hall"],
-    "p0_hall": ["p0_copa", "p0_circulacao", "p0_reuniao"],
+    "p0_biblioteca": ["p0_multiusos", "p0_circulacao", "p0_hall"],
+    "p0_hall": ["p0_biblioteca", "p0_circulacao", "p0_reuniao"],
+    "p0_reuniao": ["p0_hall", "p0_recepcao", "p0_wc"],
+    "p0_recepcao": ["p0_reuniao", "p0_arrumo"],
+    "p0_arrumo": ["p0_recepcao", "p0_wc"],
+    "p0_wc": ["p0_reuniao", "p0_arrumo"],
     "p0_circulacao": [
         "p0_multiusos",
         "p0_biblioteca",
         "p0_hall",
-        "p0_formacao1",
-        "p0_formacao2",
-        "p0_formacao3",
+        "p0_auditorio",
+        "p0_sala",
+        "p0_copa",
+        "p0_informatica",
     ],
-    "p0_reuniao": ["p0_hall", "p0_informatica"],
-    "p0_informatica": ["p0_reuniao", "p0_wc"],
-    "p0_formacao1": ["p0_circulacao"],
-    "p0_formacao2": ["p0_circulacao"],
-    "p0_formacao3": ["p0_circulacao"],
-    "p0_wc": ["p0_informatica"],
+    "p0_auditorio": ["p0_circulacao"],
+    "p0_sala": ["p0_circulacao"],
+    "p0_copa": ["p0_circulacao"],
+    "p0_informatica": ["p0_circulacao"],
     "p1_dojo": ["p1_circulacao", "p1_arquivo"],
-    "p1_arquivo": ["p1_dojo", "p1_circulacao", "p1_salagrande"],
-    "p1_salagrande": ["p1_arquivo", "p1_circulacao", "p1_salapequena"],
-    "p1_salapequena": ["p1_salagrande", "p1_armazem"],
-    "p1_circulacao": ["p1_dojo", "p1_arquivo", "p1_salagrande"],
-    "p1_armazem": ["p1_salapequena"],
+    "p1_arquivo": ["p1_dojo", "p1_circulacao", "p1_sala_a"],
+    "p1_sala_a": ["p1_arquivo", "p1_circulacao", "p1_reunioes"],
+    "p1_reunioes": ["p1_sala_a", "p1_wc", "p1_arrumos"],
+    "p1_circulacao": [
+        "p1_dojo",
+        "p1_arquivo",
+        "p1_sala_a",
+        "p1_sala_b",
+        "p1_sala_c",
+        "p1_sala_d",
+    ],
+    "p1_sala_b": ["p1_circulacao"],
+    "p1_sala_c": ["p1_circulacao"],
+    "p1_sala_d": ["p1_circulacao"],
+    "p1_wc": ["p1_reunioes"],
+    "p1_arrumos": ["p1_reunioes"],
 }
 
 # Edge definitions for stigmergy routing
@@ -535,7 +578,7 @@ def compute_risk_cost(
     # Get current occupancy
     n_people = 0
     occ_df = store.get_zone_data("occupancy", zone_id)
-    if occ_df is not None and not occ_df.empty:
+    if not occ_df.empty:
         n_people = int(
             occ_df.sort_values("timestamp").iloc[-1].get("occupant_count", 0)
         )
@@ -545,7 +588,7 @@ def compute_risk_cost(
     if hazard_type == "fire":
         # Higher probability if temperature anomalies detected
         comfort_df = store.get_zone_data("comfort", zone_id)
-        if comfort_df is not None and not comfort_df.empty:
+        if not comfort_df.empty:
             latest = comfort_df.sort_values("timestamp").iloc[-1]
             temp = latest.get("temperature_c", 22)
             if temp and temp > 28:
@@ -648,13 +691,17 @@ def compute_building_afi(
             sensor_type = sensor_deployment.get(zone.id, "cheap_iot")
             perception = compute_perception(zone.id, sensor_type, cfg)
             distortion = compute_distortion(zone.id, cfg)
+            raw_f = round(perception.P / distortion.D, 4) if distortion.D > 0 else 0.0
+            smoothed_f = _ema_smooth(zone.id, "freedom", raw_f)
             freedom = FreedomResult(
                 zone_id=zone.id,
                 P=perception.P,
                 D=distortion.D,
-                F=round(perception.P / distortion.D, 4) if distortion.D > 0 else 0.0,
+                F=round(smoothed_f, 4),
             )
             financial = compute_financial_bleed(zone.id, cfg)
+            smoothed_bleed = _ema_smooth(zone.id, "bleed", financial.total_bleed_eur_hr)
+            financial.total_bleed_eur_hr = round(smoothed_bleed, 4)
             risk = compute_risk_cost(zone.id, config=cfg)
 
             zones_afi[zone.id] = ZoneAFI(
@@ -714,7 +761,7 @@ def _compute_temperature_barrier(zone_id: str, cfg: AFIConfig) -> float:
         Barrier value (1.0 = no barrier, higher = worse).
     """
     comfort_df = store.get_zone_data("comfort", zone_id)
-    if comfort_df is None or comfort_df.empty:
+    if comfort_df.empty:
         return 1.0
 
     latest = comfort_df.sort_values("timestamp").iloc[-1]
@@ -742,7 +789,7 @@ def _compute_co2_barrier(zone_id: str, cfg: AFIConfig) -> float:
         Barrier value.
     """
     comfort_df = store.get_zone_data("comfort", zone_id)
-    if comfort_df is None or comfort_df.empty:
+    if comfort_df.empty:
         return 1.0
 
     latest = comfort_df.sort_values("timestamp").iloc[-1]
@@ -770,7 +817,7 @@ def _compute_crowding_barrier(zone_id: str) -> float:
         return 1.0
 
     occ_df = store.get_zone_data("occupancy", zone_id)
-    if occ_df is None or occ_df.empty:
+    if occ_df.empty:
         return 1.0
 
     latest = occ_df.sort_values("timestamp").iloc[-1]
@@ -795,7 +842,7 @@ def _compute_energy_cost(zone_id: str, cfg: AFIConfig) -> float:
         Energy cost in €/hr.
     """
     energy_df = store.get_zone_data("energy", zone_id)
-    if energy_df is None or energy_df.empty:
+    if energy_df.empty:
         return 0.0
 
     latest = energy_df.sort_values("timestamp").iloc[-1]
@@ -821,9 +868,9 @@ def _compute_open_window_penalty(zone_id: str, area_m2: float, cfg: AFIConfig) -
     comfort_df = store.get_zone_data("comfort", zone_id)
     weather_df = store.get("weather")
 
-    if comfort_df is None or comfort_df.empty:
+    if comfort_df.empty:
         return 0.0
-    if weather_df is None or weather_df.empty:
+    if weather_df.empty:
         return 0.0
 
     indoor_temp = comfort_df.sort_values("timestamp").iloc[-1].get("temperature_c")
@@ -862,7 +909,7 @@ def _compute_human_capital_loss(zone_id: str, cfg: AFIConfig) -> float:
     """
     # Get current occupancy
     occ_df = store.get_zone_data("occupancy", zone_id)
-    if occ_df is None or occ_df.empty:
+    if occ_df.empty:
         return 0.0
 
     latest_occ = occ_df.sort_values("timestamp").iloc[-1]
@@ -872,7 +919,7 @@ def _compute_human_capital_loss(zone_id: str, cfg: AFIConfig) -> float:
 
     # Compute comfort index (0-100) from comfort data
     comfort_df = store.get_zone_data("comfort", zone_id)
-    if comfort_df is None or comfort_df.empty:
+    if comfort_df.empty:
         return 0.0
 
     latest = comfort_df.sort_values("timestamp").iloc[-1]

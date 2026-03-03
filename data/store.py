@@ -44,19 +44,20 @@ class DataStore:
             self._version += 1
             logger.debug(f"Stored '{name}': {len(df)} rows, {list(df.columns)}")
 
-    def get(self, name: str) -> pd.DataFrame | None:
+    def get(self, name: str) -> pd.DataFrame:
         """Retrieve a DataFrame by name.
 
         Args:
             name: Dataset identifier.
 
         Returns:
-            The stored DataFrame, or None if not found.
+            The stored DataFrame, or an empty DataFrame if not found.
         """
         with self._lock:
             df = self._data.get(name)
             if df is None:
-                return None
+                logger.debug(f"Dataset '{name}' not found, returning empty DataFrame")
+                return pd.DataFrame()
             return df.copy()
 
     def keys(self) -> list[str]:
@@ -86,7 +87,7 @@ class DataStore:
             self._data.clear()
             logger.debug("DataStore cleared")
 
-    def get_zone_data(self, name: str, zone_id: str) -> pd.DataFrame | None:
+    def get_zone_data(self, name: str, zone_id: str) -> pd.DataFrame:
         """Retrieve data for a specific zone from a dataset.
 
         Args:
@@ -94,10 +95,10 @@ class DataStore:
             zone_id: The zone identifier to filter by.
 
         Returns:
-            Filtered DataFrame or None if dataset not found.
+            Filtered DataFrame (empty if dataset not found or zone missing).
         """
         df = self.get(name)
-        if df is None or "zone_id" not in df.columns:
+        if df.empty or "zone_id" not in df.columns:
             return df
         return df[df["zone_id"] == zone_id].reset_index(drop=True)
 
@@ -106,7 +107,7 @@ class DataStore:
         name: str,
         start: datetime | pd.Timestamp,
         end: datetime | pd.Timestamp,
-    ) -> pd.DataFrame | None:
+    ) -> pd.DataFrame:
         """Retrieve data within a time range from a dataset.
 
         Args:
@@ -115,11 +116,11 @@ class DataStore:
             end: End of the time range (inclusive).
 
         Returns:
-            Filtered DataFrame or None if dataset not found.
+            Filtered DataFrame (empty if dataset not found).
         """
         df = self.get(name)
-        if df is None:
-            return None
+        if df.empty:
+            return df
         if "timestamp" in df.columns:
             mask = (df["timestamp"] >= pd.Timestamp(start)) & (
                 df["timestamp"] <= pd.Timestamp(end)
@@ -127,7 +128,7 @@ class DataStore:
             return df[mask].reset_index(drop=True)
         return df
 
-    def get_latest(self, name: str, n: int = 1) -> pd.DataFrame | None:
+    def get_latest(self, name: str, n: int = 1) -> pd.DataFrame:
         """Retrieve the most recent n rows from a dataset.
 
         Args:
@@ -135,11 +136,11 @@ class DataStore:
             n: Number of most recent rows to return.
 
         Returns:
-            DataFrame with last n rows or None if dataset not found.
+            DataFrame with last n rows (empty if dataset not found).
         """
         df = self.get(name)
-        if df is None:
-            return None
+        if df.empty:
+            return df
         if "timestamp" in df.columns:
             df = df.sort_values("timestamp")
         return df.tail(n).reset_index(drop=True)

@@ -20,9 +20,13 @@ TEXT_INVERSE = "#FFFFFF"
 TEXT_LINK = "#0071E3"
 
 # ── Accent / Brand ────────────────────────────
-ACCENT_BLUE = "#0071E3"
-ACCENT_BLUE_HOVER = "#0077ED"
-ACCENT_BLUE_LIGHT = "#E1F0FF"
+ACCENT_GREEN = "#296649"
+ACCENT_GREEN_HOVER = "#327A57"
+ACCENT_GREEN_LIGHT = "#E8F5EE"
+# Legacy alias — components may still reference ACCENT_BLUE
+ACCENT_BLUE = ACCENT_GREEN
+ACCENT_BLUE_HOVER = ACCENT_GREEN_HOVER
+ACCENT_BLUE_LIGHT = ACCENT_GREEN_LIGHT
 
 # ── Status Colors ─────────────────────────────
 STATUS_HEALTHY = "#34C759"
@@ -151,19 +155,19 @@ CHART_TEMPLATE = {
 MANTINE_THEME = {
     "fontFamily": FONT_STACK,
     "fontFamilyMonospace": FONT_DATA_STACK,
-    "primaryColor": "blue",
+    "primaryColor": "green",
     "colors": {
-        "blue": [
-            "#E1F0FF",
-            "#CCE4FF",
-            "#99C9FF",
-            "#66ADFF",
-            "#3392FF",
-            ACCENT_BLUE,
-            "#005BB5",
-            "#004494",
-            "#002E73",
-            "#001752",
+        "green": [
+            "#E8F5EE",
+            "#C5E6D3",
+            "#9DD4B5",
+            "#75C297",
+            "#4DAF79",
+            ACCENT_GREEN,
+            "#215739",
+            "#19432C",
+            "#112F1F",
+            "#091B12",
         ],
     },
     "defaultRadius": "md",

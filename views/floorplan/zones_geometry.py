@@ -4,18 +4,18 @@ Defines the 2D polygon coordinates for each zone, used by both
 the 2D SVG renderer and the 3D view. Coordinates are in meters
 relative to building origin (bottom-left corner of ground floor).
 
-DWG-translated geometry for the HORSE/Renault CFT training building
-in Aveiro. Building bounding box: ~48.4m x 15m per floor.
+Geometry for the HORSE/Renault CFT training building in Aveiro.
+Building bounding box: 30.3m x 18.3m per floor.
 """
 
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-# Floor dimensions in meters (DWG bounding box)
-FLOOR_WIDTH_M = 48.4
-FLOOR_HEIGHT_M = 15.0
-FLOOR_HEIGHT_3D_M = 3.0  # Floor-to-ceiling height
+# Floor dimensions in meters (building grid)
+FLOOR_WIDTH_M = 30.3
+FLOOR_HEIGHT_M = 18.3
+FLOOR_HEIGHT_3D_M = 3.2  # Floor-to-ceiling height (Z offset for Piso 1)
 
 
 class ZoneGeometry(BaseModel):
@@ -32,14 +32,15 @@ class ZoneGeometry(BaseModel):
 
 
 # =====================================================
-# Ground Floor (Piso 0) -- DWG-translated Zone Polygons
+# Ground Floor (Piso 0) — 30.3m x 18.3m grid
 # =====================================================
 _FLOOR_0_ZONE_DEFS: list[ZoneGeometry] = [
+    # ── South row (y=0 → 8.5) ──
     ZoneGeometry(
         id="p0_multiusos",
         name="Sala Multiusos",
         floor=0,
-        points=[(0, 0), (10, 0), (10, 9.3), (0, 9.3)],
+        points=[(0, 0), (11, 0), (11, 8.5), (0, 8.5)],
         area=93.10,
         capacity=60,
     ),
@@ -47,135 +48,180 @@ _FLOOR_0_ZONE_DEFS: list[ZoneGeometry] = [
         id="p0_biblioteca",
         name="Biblioteca/Espolio",
         floor=0,
-        points=[(10, 0), (15, 0), (15, 9.3), (10, 9.3)],
-        area=46.50,
+        points=[(11, 0), (17, 0), (17, 8.5), (11, 8.5)],
+        area=48.50,
         capacity=20,
-    ),
-    ZoneGeometry(
-        id="p0_copa",
-        name="Zona Social / Copa",
-        floor=0,
-        points=[(15, 0), (22, 0), (22, 5), (15, 5)],
-        area=35.10,
-        capacity=15,
     ),
     ZoneGeometry(
         id="p0_hall",
         name="Hall",
         floor=0,
-        points=[(22, 0), (30, 0), (30, 5), (22, 5)],
-        area=41.50,
+        points=[(17, 0), (22.5, 0), (22.5, 8.5), (17, 8.5)],
+        area=43.75,
         capacity=30,
-    ),
-    ZoneGeometry(
-        id="p0_circulacao",
-        name="Circulacao",
-        floor=0,
-        points=[(0, 9.3), (30, 9.3), (30, 11), (0, 11)],
-        area=50.30,
-        capacity=0,
     ),
     ZoneGeometry(
         id="p0_reuniao",
         name="Sala Reuniao",
         floor=0,
-        points=[(30, 0), (35, 0), (35, 5), (30, 5)],
+        points=[(22.5, 0), (26.5, 0), (26.5, 6), (22.5, 6)],
         area=25.10,
         capacity=12,
     ),
     ZoneGeometry(
-        id="p0_informatica",
-        name="Sala Informatica",
+        id="p0_recepcao",
+        name="Recepcao",
         floor=0,
-        points=[(35, 0), (43.3, 0), (43.3, 5), (35, 5)],
-        area=41.70,
-        capacity=30,
+        points=[(26.5, 0), (30.3, 0), (30.3, 3), (26.5, 3)],
+        area=10.15,
+        capacity=5,
     ),
     ZoneGeometry(
-        id="p0_formacao1",
-        name="Sala Formacao 1",
+        id="p0_arrumo",
+        name="Arrumos",
         floor=0,
-        points=[(0, 11), (10, 11), (10, 15), (0, 15)],
-        area=40.0,
-        capacity=25,
-    ),
-    ZoneGeometry(
-        id="p0_formacao2",
-        name="Sala Formacao 2",
-        floor=0,
-        points=[(10, 11), (20, 11), (20, 15), (10, 15)],
-        area=40.0,
-        capacity=25,
-    ),
-    ZoneGeometry(
-        id="p0_formacao3",
-        name="Sala Formacao 3",
-        floor=0,
-        points=[(20, 11), (30, 11), (30, 15), (20, 15)],
-        area=40.0,
-        capacity=25,
+        points=[(26.5, 3), (30.3, 3), (30.3, 6), (26.5, 6)],
+        area=8.00,
+        capacity=0,
     ),
     ZoneGeometry(
         id="p0_wc",
         name="WCs",
         floor=0,
-        points=[(43.3, 0), (48.4, 0), (48.4, 5), (43.3, 5)],
-        area=25.0,
+        points=[(22.5, 6), (30.3, 6), (30.3, 8.5), (22.5, 8.5)],
+        area=24.00,
         capacity=0,
+    ),
+    # ── Corridor (y=8.5 → 10) ──
+    ZoneGeometry(
+        id="p0_circulacao",
+        name="Circulacao",
+        floor=0,
+        points=[(0, 8.5), (30.3, 8.5), (30.3, 10), (0, 10)],
+        area=50.30,
+        capacity=0,
+    ),
+    # ── North row (y=10 → 18.3) ──
+    ZoneGeometry(
+        id="p0_auditorio",
+        name="Auditorio",
+        floor=0,
+        points=[(0, 10), (9, 10), (9, 18.3), (0, 18.3)],
+        area=72.70,
+        capacity=57,
+    ),
+    ZoneGeometry(
+        id="p0_sala",
+        name="Sala Formacao",
+        floor=0,
+        points=[(9, 10), (15.2, 10), (15.2, 18.3), (9, 18.3)],
+        area=51.00,
+        capacity=30,
+    ),
+    ZoneGeometry(
+        id="p0_copa",
+        name="Zona Social / Copa",
+        floor=0,
+        points=[(15.2, 10), (19.5, 10), (19.5, 18.3), (15.2, 18.3)],
+        area=35.15,
+        capacity=15,
+    ),
+    ZoneGeometry(
+        id="p0_informatica",
+        name="Sala Informatica",
+        floor=0,
+        points=[(19.5, 10), (25.7, 10), (25.7, 18.3), (19.5, 18.3)],
+        area=43.10,
+        capacity=30,
     ),
 ]
 
 # =====================================================
-# First Floor (Piso 1) -- DWG-translated Zone Polygons
+# First Floor (Piso 1) — 30.3m x 18.3m grid
 # =====================================================
 _FLOOR_1_ZONE_DEFS: list[ZoneGeometry] = [
+    # ── South row (y=0 → 8.5) ──
     ZoneGeometry(
         id="p1_dojo",
         name="Sala Dojo Seguranca",
         floor=1,
-        points=[(0, 0), (15, 0), (15, 7.3), (0, 7.3)],
-        area=110.30,
+        points=[(0, 0), (12.5, 0), (12.5, 8.5), (0, 8.5)],
+        area=102.35,
         capacity=50,
     ),
     ZoneGeometry(
         id="p1_arquivo",
         name="Arquivo",
         floor=1,
-        points=[(15, 0), (22.8, 0), (22.8, 7.3), (15, 7.3)],
-        area=57.50,
+        points=[(12.5, 0), (16, 0), (16, 8.5), (12.5, 8.5)],
+        area=27.55,
         capacity=0,
     ),
     ZoneGeometry(
-        id="p1_salagrande",
-        name="Sala Grande",
+        id="p1_sala_a",
+        name="Sala A",
         floor=1,
-        points=[(22.8, 0), (30, 0), (30, 5.8), (22.8, 5.8)],
-        area=42.10,
-        capacity=25,
+        points=[(16, 0), (24, 0), (24, 8.5), (16, 8.5)],
+        area=63.15,
+        capacity=35,
     ),
     ZoneGeometry(
-        id="p1_salapequena",
-        name="Sala Pequena",
+        id="p1_reunioes",
+        name="Sala Reunioes",
         floor=1,
-        points=[(30, 0), (35, 0), (35, 5), (30, 5)],
-        area=25.00,
-        capacity=15,
+        points=[(24, 0), (30.3, 0), (30.3, 5.5), (24, 5.5)],
+        area=35.15,
+        capacity=20,
     ),
+    ZoneGeometry(
+        id="p1_wc",
+        name="WCs",
+        floor=1,
+        points=[(24, 5.5), (27, 5.5), (27, 8.5), (24, 8.5)],
+        area=12.00,
+        capacity=0,
+    ),
+    ZoneGeometry(
+        id="p1_arrumos",
+        name="Arrumos",
+        floor=1,
+        points=[(27, 5.5), (30.3, 5.5), (30.3, 8.5), (27, 8.5)],
+        area=10.00,
+        capacity=0,
+    ),
+    # ── Corridor (y=8.5 → 10) ──
     ZoneGeometry(
         id="p1_circulacao",
         name="Circulacao",
         floor=1,
-        points=[(0, 7.3), (30, 7.3), (30, 9), (0, 9)],
-        area=46.70,
+        points=[(0, 8.5), (30.3, 8.5), (30.3, 10), (0, 10)],
+        area=49.75,
         capacity=0,
     ),
+    # ── North row (y=10 → 18.3) ──
     ZoneGeometry(
-        id="p1_armazem",
-        name="Exibicao Armazem",
+        id="p1_sala_b",
+        name="Sala B",
         floor=1,
-        points=[(35, 0), (40.1, 0), (40.1, 5), (35, 5)],
-        area=25.80,
-        capacity=0,
+        points=[(0, 10), (7.5, 10), (7.5, 18.3), (0, 18.3)],
+        area=51.00,
+        capacity=30,
+    ),
+    ZoneGeometry(
+        id="p1_sala_c",
+        name="Sala C",
+        floor=1,
+        points=[(7.5, 10), (15, 10), (15, 18.3), (7.5, 18.3)],
+        area=51.00,
+        capacity=30,
+    ),
+    ZoneGeometry(
+        id="p1_sala_d",
+        name="Sala D",
+        floor=1,
+        points=[(15, 10), (22.5, 10), (22.5, 18.3), (15, 18.3)],
+        area=51.00,
+        capacity=30,
     ),
 ]
 

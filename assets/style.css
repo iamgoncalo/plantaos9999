@@ -18,10 +18,10 @@
     --text-secondary: #6E6E73;
     --text-tertiary: #86868B;
 
-    /* Accent */
-    --accent-blue: #0071E3;
-    --accent-blue-hover: #0077ED;
-    --accent-blue-light: #E1F0FF;
+    /* Accent — Planta Earth Green */
+    --accent-blue: #296649;
+    --accent-blue-hover: #327A57;
+    --accent-blue-light: #E8F5EE;
 
     /* Status */
     --status-healthy: #34C759;

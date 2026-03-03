@@ -9,7 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Input, Output
+from dash import Input, Output, State, no_update
+from loguru import logger
 
 from config.building import get_monitored_zones, get_zone_by_id
 from config.theme import (
@@ -58,8 +59,11 @@ def _register_energy_kpis(app: object) -> None:
         Output("energy-kpi-grid", "children"),
         Input("energy-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_energy_kpis(time_range: str, _n: int) -> list:
+    def update_energy_kpis(time_range: str, _n: int, pathname: str | None) -> list:
+        if pathname != "/energy":
+            return no_update
         df = _get_energy_data(time_range)
 
         if df is None or df.empty:
@@ -144,8 +148,20 @@ def _register_energy_timeline(app: object) -> None:
         Output("energy-chart-timeline", "figure"),
         Input("energy-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_energy_timeline(time_range: str, _n: int) -> go.Figure:
+    def update_energy_timeline(
+        time_range: str, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/energy":
+            return no_update
+        try:
+            return _energy_timeline_impl(time_range)
+        except Exception as e:
+            logger.warning(f"Energy timeline error: {e}")
+            return empty_chart("Error loading chart")
+
+    def _energy_timeline_impl(time_range: str) -> go.Figure:
         df = _get_energy_data(time_range)
         if df is None or df.empty:
             return empty_chart("No energy data available")
@@ -255,8 +271,13 @@ def _register_energy_breakdown(app: object) -> None:
         Output("energy-chart-breakdown", "figure"),
         Input("energy-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_energy_breakdown(time_range: str, _n: int) -> go.Figure:
+    def update_energy_breakdown(
+        time_range: str, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/energy":
+            return no_update
         df = _get_energy_data(time_range)
         if df is None or df.empty:
             return empty_chart("No energy data available")
@@ -299,8 +320,13 @@ def _register_energy_heatmap(app: object) -> None:
         Output("energy-chart-heatmap", "figure"),
         Input("energy-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_energy_heatmap(time_range: str, _n: int) -> go.Figure:
+    def update_energy_heatmap(
+        time_range: str, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/energy":
+            return no_update
         df = _get_energy_data(time_range)
         if df is None or df.empty:
             return empty_chart("No energy data available")
@@ -349,8 +375,13 @@ def _register_energy_scatter(app: object) -> None:
         Output("energy-chart-scatter", "figure"),
         Input("energy-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_energy_scatter(time_range: str, _n: int) -> go.Figure:
+    def update_energy_scatter(
+        time_range: str, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/energy":
+            return no_update
         period = TIME_RANGE_MAP.get(time_range, "today")
         start, end = get_period_range(period)
 

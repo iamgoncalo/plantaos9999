@@ -2,11 +2,12 @@
 
 Wires building-state-store, metric selector, and floor selector
 to the Three.js iframe srcdoc via generate_3d_html().
+Lazy-loads: skips regeneration when user is not on the 3D page.
 """
 
 from __future__ import annotations
 
-from dash import Input, Output
+from dash import Input, Output, State, no_update
 
 
 def register_3d_callbacks(app: object) -> None:
@@ -26,11 +27,13 @@ def _register_3d_update(app: object) -> None:
         Input("building-state-store", "data"),
         Input("3d-metric-selector", "value"),
         Input("3d-floor-selector", "value"),
+        State("url", "pathname"),
     )
     def update_3d_view(
         state_data: dict | None,
         metric: str | None,
         visible_floors: str | None,
+        pathname: str | None,
     ) -> str:
         """Regenerate 3D HTML from current building state.
 
@@ -38,10 +41,15 @@ def _register_3d_update(app: object) -> None:
             state_data: Serialized BuildingState dict.
             metric: Selected metric for zone coloring.
             visible_floors: Which floors to show.
+            pathname: Current URL pathname for lazy-load check.
 
         Returns:
             HTML string for the iframe srcdoc.
         """
+        # Lazy-load: skip expensive 3D generation when not on 3D page
+        if pathname != "/building_3d":
+            return no_update
+
         from views.floorplan.renderer_3d import generate_3d_html
 
         metric = metric or "freedom_index"

@@ -37,6 +37,19 @@ class AppSettings(BaseSettings):
         default="", description="Anthropic API key for Claude insights"
     )
 
+    # Demo mode
+    DEMO_MODE: bool = Field(
+        default=False, description="Enable demo mode with accelerated time"
+    )
+    DEMO_TIME_FACTOR: int = Field(
+        default=5,
+        description="In demo mode, 1 real second = N simulated minutes",
+    )
+    DEMO_ANOMALY_RATE: float = Field(
+        default=0.3,
+        description="In demo mode, probability of anomaly per zone per tick",
+    )
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

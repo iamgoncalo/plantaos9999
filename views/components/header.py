@@ -23,8 +23,17 @@ def create_header(
     Returns:
         Dash html.Div containing the header layout.
     """
+    # Hamburger button for mobile sidebar toggle (hidden on desktop via CSS)
+    hamburger = html.Button(
+        DashIconify(icon="mdi:menu", width=24),
+        id="sidebar-toggle-btn",
+        className="sidebar-toggle-btn",
+        n_clicks=0,
+    )
+
     left = html.Div(
         [
+            hamburger,
             html.H1(
                 id="header-title",
                 children="Overview",

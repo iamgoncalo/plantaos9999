@@ -7,11 +7,9 @@ organized by page/feature and imported here for centralized registration.
 
 from __future__ import annotations
 
-from datetime import datetime
+from dash import Input, Output, State, html
+from dash_iconify import DashIconify
 
-from dash import Input, Output, State, ctx, html
-
-from utils.time_utils import current_shift
 from views.callbacks.building_3d_cb import register_3d_callbacks
 from views.callbacks.comfort_cb import register_comfort_callbacks
 from views.callbacks.energy_cb import register_energy_callbacks
@@ -30,13 +28,6 @@ _PAGE_TITLES: dict[str, str] = {
     "/building_3d": "3D View",
 }
 
-_SHIFT_LABELS: dict[str, str] = {
-    "morning": "Morning Shift",
-    "afternoon": "Afternoon Shift",
-    "night": "Night Shift",
-    "off_hours": "Off Hours",
-}
-
 
 def register_callbacks(app: object) -> None:
     """Register all dashboard callbacks with the Dash app.
@@ -45,14 +36,15 @@ def register_callbacks(app: object) -> None:
         app: The Dash application instance.
     """
     _register_routing_callback(app)
-    _register_clock_callback(app)
+    _register_clientside_clock(app)
     _register_building_state_callback(app)
     _register_overview_kpi_callback(app)
     _register_floorplan_callback(app)
-    _register_floor_tab_callback(app)
+    _register_clientside_floor_tab(app)
     _register_zone_click_callback(app)
     _register_alert_feed_callback(app)
-    _register_header_status_callback(app)
+    _register_clientside_header_status(app)
+    _register_clientside_sidebar_toggle(app)
     # Detail page callbacks
     register_energy_callbacks(app)
     register_comfort_callbacks(app)
@@ -94,34 +86,72 @@ def _register_routing_callback(app: object) -> None:
         if creator:
             return creator(), title
 
+        # Enhanced 404 page
         return html.Div(
-            [
-                html.H2("404 — Page Not Found"),
-                html.P(
-                    f"The path '{pathname}' does not exist.",
-                    style={"color": "#6E6E73"},
-                ),
-            ],
+            html.Div(
+                [
+                    DashIconify(
+                        icon="mdi:map-marker-question-outline",
+                        width=48,
+                        color="#86868B",
+                    ),
+                    html.H2(
+                        "404 — Page Not Found",
+                        style={
+                            "margin": "16px 0 8px",
+                            "fontSize": "20px",
+                            "fontWeight": 600,
+                        },
+                    ),
+                    html.P(
+                        f"The path '{pathname}' does not exist.",
+                        style={"color": "#6E6E73", "marginBottom": "24px"},
+                    ),
+                    html.A(
+                        "Go to Overview",
+                        href="/",
+                        className="status-badge healthy",
+                        style={
+                            "textDecoration": "none",
+                            "padding": "8px 20px",
+                            "fontSize": "14px",
+                        },
+                    ),
+                ],
+                className="card",
+                style={
+                    "textAlign": "center",
+                    "padding": "48px",
+                    "maxWidth": "480px",
+                    "margin": "80px auto",
+                },
+            ),
             className="page-enter",
-            style={"textAlign": "center", "paddingTop": "80px"},
         ), title
 
 
-def _register_clock_callback(app: object) -> None:
-    """Register the header clock + shift indicator callback."""
-
-    @app.callback(
+def _register_clientside_clock(app: object) -> None:
+    """Clientside callback for header clock + shift indicator."""
+    app.clientside_callback(
+        """
+        function(n) {
+            var now = new Date();
+            var h = String(now.getHours()).padStart(2, '0');
+            var m = String(now.getMinutes()).padStart(2, '0');
+            var s = String(now.getSeconds()).padStart(2, '0');
+            var clock = h + ':' + m + ':' + s;
+            var hour = now.getHours();
+            var shift;
+            if (hour >= 6 && hour < 14) shift = 'Morning Shift';
+            else if (hour >= 14 && hour < 22) shift = 'Afternoon Shift';
+            else shift = 'Off Hours';
+            return [clock, shift];
+        }
+        """,
         Output("header-clock", "children"),
         Output("header-shift", "children"),
         Input("data-refresh-interval", "n_intervals"),
     )
-    def update_clock(_n: int) -> tuple[str, str]:
-        """Update the header clock and shift indicator."""
-        now = datetime.now()
-        clock_str = now.strftime("%H:%M:%S")
-        shift = current_shift(now)
-        shift_label = _SHIFT_LABELS.get(shift, shift.title())
-        return clock_str, shift_label
 
 
 def _register_building_state_callback(app: object) -> None:
@@ -160,10 +190,10 @@ def _register_overview_kpi_callback(app: object) -> None:
                 create_kpi_card("Building Health", "—", icon="mdi:heart-pulse"),
             ]
 
-        energy = state_data.get("total_energy_kwh", 0)
-        occupancy = state_data.get("total_occupancy", 0)
-        freedom = state_data.get("avg_freedom_index", 0)
-        alerts = state_data.get("active_alerts", 0)
+        energy = state_data.get("total_energy_kwh", 0) or 0
+        occupancy = state_data.get("total_occupancy", 0) or 0
+        freedom = state_data.get("avg_freedom_index", 0) or 0
+        alerts = state_data.get("active_alerts", 0) or 0
 
         # Compute avg temperature from floor states
         floors = state_data.get("floors", [])
@@ -237,25 +267,26 @@ def _register_floorplan_callback(app: object) -> None:
         return render_floorplan_2d(floor=floor, zone_data=zone_data)
 
 
-def _register_floor_tab_callback(app: object) -> None:
-    """Switch active floor when floor tabs are clicked."""
-
-    @app.callback(
+def _register_clientside_floor_tab(app: object) -> None:
+    """Clientside callback for floor tab switching."""
+    app.clientside_callback(
+        """
+        function(n0, n1) {
+            var ctx = window.dash_clientside.callback_context;
+            if (!ctx.triggered.length) return [0, 'floor-tab active', 'floor-tab'];
+            var id = ctx.triggered[0].prop_id.split('.')[0];
+            if (id === 'floor-tab-1') {
+                return [1, 'floor-tab', 'floor-tab active'];
+            }
+            return [0, 'floor-tab active', 'floor-tab'];
+        }
+        """,
         Output("active-floor-store", "data"),
         Output("floor-tab-0", "className"),
         Output("floor-tab-1", "className"),
         Input("floor-tab-0", "n_clicks"),
         Input("floor-tab-1", "n_clicks"),
     )
-    def switch_floor(
-        n0: int | None,
-        n1: int | None,
-    ) -> tuple[int, str, str]:
-        """Handle floor tab clicks."""
-        triggered = ctx.triggered_id
-        if triggered == "floor-tab-1":
-            return 1, "floor-tab", "floor-tab active"
-        return 0, "floor-tab active", "floor-tab"
 
 
 def _register_zone_click_callback(app: object) -> None:
@@ -348,31 +379,49 @@ def _register_alert_feed_callback(app: object) -> None:
         return create_alert_feed(alerts=alerts)
 
 
-def _register_header_status_callback(app: object) -> None:
-    """Update header alert count and status badge from building state."""
-
-    @app.callback(
+def _register_clientside_header_status(app: object) -> None:
+    """Clientside callback for header alert count and status badge."""
+    app.clientside_callback(
+        """
+        function(stateData) {
+            if (!stateData) return ['0', 'status-badge healthy'];
+            var alerts = stateData.active_alerts || 0;
+            var badge;
+            if (alerts > 5) badge = 'status-badge critical';
+            else if (alerts > 0) badge = 'status-badge warning';
+            else badge = 'status-badge healthy';
+            return [String(alerts), badge];
+        }
+        """,
         Output("header-alert-count", "children"),
         Output("header-status", "className"),
         Input("building-state-store", "data"),
     )
-    def update_header_status(
-        state_data: dict | None,
-    ) -> tuple[str, str]:
-        """Update header indicators."""
-        if not state_data:
-            return "0", "status-badge healthy"
 
-        alerts = state_data.get("active_alerts", 0)
 
-        if alerts > 5:
-            badge_class = "status-badge critical"
-        elif alerts > 0:
-            badge_class = "status-badge warning"
-        else:
-            badge_class = "status-badge healthy"
-
-        return str(alerts), badge_class
+def _register_clientside_sidebar_toggle(app: object) -> None:
+    """Clientside callback for mobile sidebar toggle."""
+    app.clientside_callback(
+        """
+        function(nBtn, nOverlay) {
+            var sidebar = document.getElementById('sidebar');
+            var overlay = document.getElementById('sidebar-overlay');
+            if (!sidebar) return window.dash_clientside.no_update;
+            var isOpen = sidebar.classList.contains('open');
+            if (isOpen) {
+                sidebar.classList.remove('open');
+                if (overlay) overlay.classList.remove('active');
+            } else {
+                sidebar.classList.add('open');
+                if (overlay) overlay.classList.add('active');
+            }
+            return !isOpen;
+        }
+        """,
+        Output("sidebar-open-store", "data"),
+        Input("sidebar-toggle-btn", "n_clicks"),
+        Input("sidebar-overlay", "n_clicks"),
+    )
 
 
 def _build_alert_message(zone_data: dict, name: str) -> str:

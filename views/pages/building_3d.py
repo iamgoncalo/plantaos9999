@@ -87,10 +87,16 @@ def create_building_3d_page() -> html.Div:
         className="viewer-3d-legend",
     )
 
-    # 3D viewer iframe
+    # 3D viewer iframe with loading placeholder
+    _loading_html = (
+        "<html><body style='margin:0;display:flex;align-items:center;"
+        "justify-content:center;height:100vh;background:#FAFAFA;"
+        "font-family:Inter,sans-serif;color:#86868B;font-size:15px'>"
+        "Loading 3D View…</body></html>"
+    )
     iframe = html.Iframe(
         id="3d-viewer-iframe",
-        srcDoc="",
+        srcDoc=_loading_html,
         className="viewer-3d-iframe",
     )
 

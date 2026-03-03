@@ -11,7 +11,7 @@ from dash import dcc, html
 from config.theme import TEXT_TERTIARY
 from views.components.alert_feed import create_alert_feed
 from views.components.insight_card import create_insight_card
-from views.components.kpi_card import create_kpi_card
+from views.components.kpi_card import create_kpi_skeleton
 
 
 def create_overview_page() -> html.Div:
@@ -21,39 +21,9 @@ def create_overview_page() -> html.Div:
         Dash html.Div containing the overview page with floorplan,
         KPI grid, and alert feed.
     """
-    # Row 1: 5 KPI cards
+    # Row 1: 5 skeleton KPI cards (replaced by callback when data loads)
     kpi_grid = html.Div(
-        [
-            create_kpi_card(
-                title="Total Energy",
-                value="—",
-                unit="kWh",
-                icon="mdi:flash",
-            ),
-            create_kpi_card(
-                title="Avg Temperature",
-                value="—",
-                unit="°C",
-                icon="mdi:thermometer",
-            ),
-            create_kpi_card(
-                title="Occupancy",
-                value="—",
-                unit="people",
-                icon="mdi:account-group",
-            ),
-            create_kpi_card(
-                title="Active Alerts",
-                value="—",
-                icon="mdi:alert-circle-outline",
-            ),
-            create_kpi_card(
-                title="Building Health",
-                value="—",
-                unit="/100",
-                icon="mdi:heart-pulse",
-            ),
-        ],
+        [create_kpi_skeleton() for _ in range(5)],
         className="grid-5",
         id="overview-kpi-grid",
     )

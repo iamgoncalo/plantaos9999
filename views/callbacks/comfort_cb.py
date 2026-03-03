@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Input, Output
+from dash import Input, Output, State, no_update
 
 from config.building import get_monitored_zones, get_zone_by_id
 from config.theme import (
@@ -72,8 +72,13 @@ def _register_comfort_kpis(app: object) -> None:
         Output("comfort-kpi-grid", "children"),
         Input("comfort-zone-filter", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_comfort_kpis(zones: list[str] | None, _n: int) -> list:
+    def update_comfort_kpis(
+        zones: list[str] | None, _n: int, pathname: str | None
+    ) -> list:
+        if pathname != "/comfort":
+            return no_update
         df = _get_comfort_data(zones)
 
         if df is None or df.empty:
@@ -140,8 +145,13 @@ def _register_comfort_temperature(app: object) -> None:
         Output("comfort-chart-temperature", "figure"),
         Input("comfort-zone-filter", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_comfort_temperature(zones: list[str] | None, _n: int) -> go.Figure:
+    def update_comfort_temperature(
+        zones: list[str] | None, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/comfort":
+            return no_update
         df = _get_comfort_data(zones)
         if df is None or df.empty:
             return empty_chart("No comfort data available")
@@ -206,8 +216,13 @@ def _register_comfort_matrix(app: object) -> None:
         Output("comfort-chart-matrix", "figure"),
         Input("comfort-zone-filter", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_comfort_matrix(zones: list[str] | None, _n: int) -> go.Figure:
+    def update_comfort_matrix(
+        zones: list[str] | None, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/comfort":
+            return no_update
         df = _get_comfort_data(zones)
         if df is None or df.empty:
             return empty_chart("No comfort data available")
@@ -285,8 +300,13 @@ def _register_comfort_co2_scatter(app: object) -> None:
         Output("comfort-chart-co2", "figure"),
         Input("comfort-zone-filter", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_co2_scatter(zones: list[str] | None, _n: int) -> go.Figure:
+    def update_co2_scatter(
+        zones: list[str] | None, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/comfort":
+            return no_update
         comfort_df = _get_comfort_data(zones)
         if comfort_df is None or comfort_df.empty:
             return empty_chart("No comfort data available")
@@ -392,8 +412,13 @@ def _register_comfort_humidity(app: object) -> None:
         Output("comfort-chart-humidity", "figure"),
         Input("comfort-zone-filter", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_humidity_violin(zones: list[str] | None, _n: int) -> go.Figure:
+    def update_humidity_violin(
+        zones: list[str] | None, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/comfort":
+            return no_update
         df = _get_comfort_data(zones)
         if df is None or df.empty:
             return empty_chart("No comfort data available")

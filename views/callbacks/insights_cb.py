@@ -12,6 +12,7 @@ from dash import Input, Output, State, ctx, html, no_update
 from dash_iconify import DashIconify
 from loguru import logger
 
+from config.settings import settings
 from config.theme import ACCENT_BLUE, TEXT_TERTIARY
 from core.insights import (
     answer_building_question,
@@ -50,6 +51,10 @@ def _register_insight_generation(app: object) -> None:
         """Scan building state and generate insights."""
         if existing_insights is None:
             existing_insights = []
+
+        # Demo mode: pre-seed insights on first load
+        if settings.DEMO_MODE and not existing_insights:
+            return _demo_seed_insights()
 
         if not state_data:
             return existing_insights
@@ -203,6 +208,55 @@ def _build_summary_strip(total: int, critical: int, warnings: int) -> list:
             ],
             className="summary-badge",
         ),
+    ]
+
+
+def _demo_seed_insights() -> list:
+    """Return 3 pre-seeded insights for demo mode first load."""
+    now = datetime.now().isoformat()
+    return [
+        {
+            "title": "CO₂ levels elevated in Sala Multiusos",
+            "body": (
+                "CO₂ concentration in Sala Multiusos has reached 1,350 ppm, "
+                "exceeding the optimal threshold of 800 ppm. This typically "
+                "indicates insufficient ventilation relative to current occupancy. "
+                "Consider increasing HVAC fresh air intake or opening windows."
+            ),
+            "severity": "critical",
+            "category": "anomaly",
+            "affected_zones": ["f0_sala_multiusos"],
+            "action": "Increase ventilation in Sala Multiusos immediately.",
+            "timestamp": now,
+        },
+        {
+            "title": "Energy spike detected on Piso 1",
+            "body": (
+                "Total energy consumption on Piso 1 is 2.8× higher than the "
+                "baseline for this time of day. The spike is concentrated in "
+                "Sala Dojo Segurança and appears to correlate with HVAC "
+                "equipment running at maximum capacity despite low occupancy."
+            ),
+            "severity": "warning",
+            "category": "energy",
+            "affected_zones": ["f1_sala_dojo_seguranca"],
+            "action": "Check HVAC scheduling for Piso 1 — possible stuck relay.",
+            "timestamp": now,
+        },
+        {
+            "title": "Temperature anomaly in Sala Informática",
+            "body": (
+                "Temperature in Sala Informática has dropped to 16.2°C, "
+                "well below the comfortable range of 20-24°C. Nearby zones "
+                "show normal readings, suggesting a localized issue such as "
+                "a window left open or heating system malfunction."
+            ),
+            "severity": "warning",
+            "category": "comfort",
+            "affected_zones": ["f0_sala_informatica"],
+            "action": "Inspect Sala Informática for open windows or HVAC fault.",
+            "timestamp": now,
+        },
     ]
 
 

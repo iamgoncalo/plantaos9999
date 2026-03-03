@@ -6,6 +6,7 @@ spatial relationships between zones for correlation analysis.
 
 from __future__ import annotations
 
+import random
 from datetime import datetime
 
 import numpy as np
@@ -14,6 +15,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from config.building import get_zones_by_floor
+from config.settings import settings
 from config.thresholds import evaluate_comfort
 from core.freedom_index import compute_zone_freedom
 from data.store import store
@@ -193,6 +195,10 @@ def compute_building_state() -> BuildingState:
     total_occ = sum(f.total_occupancy for f in floor_states)
     total_energy = sum(f.total_energy_kwh for f in floor_states)
 
+    # Demo mode: inject anomalies for visible alerts during demos
+    if settings.DEMO_MODE:
+        _inject_demo_anomalies(floor_states)
+
     # Average freedom index across all monitored zones
     all_zone_states = [z for f in floor_states for z in f.zones]
     freedom_scores = [z.freedom_index for z in all_zone_states if z.freedom_index > 0]
@@ -259,3 +265,72 @@ def _classify_zone_status(
     }
     worst = max(statuses, key=lambda s: severity_order.get(s, -1))
     return worst
+
+
+def _inject_demo_anomalies(floor_states: list[FloorState]) -> None:
+    """Inject random anomalies into zone states for demo visibility.
+
+    Randomly selects 2-3 zones and pushes their metrics into
+    warning/critical range based on DEMO_ANOMALY_RATE.
+
+    Args:
+        floor_states: Floor states to mutate in-place.
+    """
+    all_zones = [z for f in floor_states for z in f.zones]
+    if not all_zones:
+        return
+
+    n_anomalies = random.randint(2, 3)
+    candidates = [z for z in all_zones if z.status not in ("warning", "critical")]
+    targets = random.sample(candidates, min(n_anomalies, len(candidates)))
+
+    for zone in targets:
+        if random.random() > settings.DEMO_ANOMALY_RATE:
+            continue
+        anomaly_type = random.choice(["co2", "temperature", "energy"])
+        if anomaly_type == "co2" and zone.co2_ppm is not None:
+            zone.co2_ppm = random.uniform(1200, 1800)
+            zone.status = "critical"
+            zone.freedom_index = max(10, zone.freedom_index - 40)
+        elif anomaly_type == "temperature" and zone.temperature_c is not None:
+            zone.temperature_c = random.choice(
+                [random.uniform(28, 32), random.uniform(14, 17)]
+            )
+            zone.status = "warning"
+            zone.freedom_index = max(20, zone.freedom_index - 30)
+        elif anomaly_type == "energy":
+            zone.total_energy_kwh *= random.uniform(2.5, 4.0)
+            zone.status = "warning"
+            zone.freedom_index = max(25, zone.freedom_index - 25)
+
+
+def _inject_demo_anomalies(floor_states: list[FloorState]) -> None:
+    """Randomly push 2-3 zones to warning/critical for demo visibility.
+
+    Mutates zone states in place based on DEMO_ANOMALY_RATE.
+    """
+    all_zones = [z for f in floor_states for z in f.zones]
+    if not all_zones:
+        return
+
+    target_count = random.randint(2, 3)
+    candidates = [z for z in all_zones if z.status not in ("warning", "critical")]
+
+    for zone in random.sample(candidates, min(target_count, len(candidates))):
+        if random.random() > settings.DEMO_ANOMALY_RATE:
+            continue
+        # Pick a random anomaly type
+        anomaly = random.choice(["co2", "temp_high", "temp_low"])
+        if anomaly == "co2" and zone.co2_ppm is not None:
+            zone.co2_ppm = random.uniform(1100, 1500)
+            zone.status = "critical"
+            zone.freedom_index = max(0, zone.freedom_index - 25)
+        elif anomaly == "temp_high" and zone.temperature_c is not None:
+            zone.temperature_c = random.uniform(27.5, 30.0)
+            zone.status = "warning"
+            zone.freedom_index = max(0, zone.freedom_index - 15)
+        elif anomaly == "temp_low" and zone.temperature_c is not None:
+            zone.temperature_c = random.uniform(14.0, 16.5)
+            zone.status = "warning"
+            zone.freedom_index = max(0, zone.freedom_index - 15)
+    logger.debug("Demo mode: injected anomalies")

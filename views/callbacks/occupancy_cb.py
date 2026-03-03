@@ -10,7 +10,7 @@ from collections import defaultdict
 
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Input, Output
+from dash import Input, Output, State, no_update
 
 from config.building import get_monitored_zones, get_zone_by_id
 from config.theme import (
@@ -60,8 +60,11 @@ def _register_occ_kpis(app: object) -> None:
         Output("occ-kpi-grid", "children"),
         Input("occ-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_occ_kpis(time_range: str, _n: int) -> list:
+    def update_occ_kpis(time_range: str, _n: int, pathname: str | None) -> list:
+        if pathname != "/occupancy":
+            return no_update
         df = _get_occ_data(time_range)
 
         if df is None or df.empty:
@@ -134,8 +137,13 @@ def _register_occ_timeline(app: object) -> None:
         Output("occ-chart-timeline", "figure"),
         Input("occ-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_occ_timeline(time_range: str, _n: int) -> go.Figure:
+    def update_occ_timeline(
+        time_range: str, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/occupancy":
+            return no_update
         df = _get_occ_data(time_range)
         if df is None or df.empty:
             return empty_chart("No occupancy data available")
@@ -227,8 +235,11 @@ def _register_occ_heatmap(app: object) -> None:
         Output("occ-chart-heatmap", "figure"),
         Input("occ-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_occ_heatmap(time_range: str, _n: int) -> go.Figure:
+    def update_occ_heatmap(time_range: str, _n: int, pathname: str | None) -> go.Figure:
+        if pathname != "/occupancy":
+            return no_update
         df = _get_occ_data(time_range)
         if df is None or df.empty:
             return empty_chart("No occupancy data available")
@@ -283,8 +294,11 @@ def _register_occ_sankey(app: object) -> None:
         Output("occ-chart-sankey", "figure"),
         Input("occ-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_occ_sankey(time_range: str, _n: int) -> go.Figure:
+    def update_occ_sankey(time_range: str, _n: int, pathname: str | None) -> go.Figure:
+        if pathname != "/occupancy":
+            return no_update
         df = _get_occ_data(time_range)
         if df is None or df.empty:
             return empty_chart("No occupancy data for flow analysis")
@@ -393,8 +407,13 @@ def _register_occ_efficiency(app: object) -> None:
         Output("occ-chart-efficiency", "figure"),
         Input("occ-time-range", "value"),
         Input("data-refresh-interval", "n_intervals"),
+        State("url", "pathname"),
     )
-    def update_occ_efficiency(time_range: str, _n: int) -> go.Figure:
+    def update_occ_efficiency(
+        time_range: str, _n: int, pathname: str | None
+    ) -> go.Figure:
+        if pathname != "/occupancy":
+            return no_update
         df = _get_occ_data(time_range)
         if df is None or df.empty:
             return empty_chart("No occupancy data available")

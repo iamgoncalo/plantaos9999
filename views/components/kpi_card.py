@@ -81,3 +81,26 @@ def create_kpi_card(
         )
 
     return html.Div(className="kpi-card", children=children)
+
+
+def create_kpi_skeleton() -> html.Div:
+    """Create a skeleton placeholder KPI card for loading state.
+
+    Returns:
+        Dash html.Div matching KPI card dimensions with skeleton animation.
+    """
+    return html.Div(
+        [
+            html.Div(className="skeleton", style={"width": "40px", "height": "40px"}),
+            html.Div(
+                className="skeleton",
+                style={"width": "80px", "height": "28px", "marginTop": "12px"},
+            ),
+            html.Div(
+                className="skeleton",
+                style={"width": "100px", "height": "14px", "marginTop": "8px"},
+            ),
+        ],
+        className="kpi-card",
+        style={"display": "flex", "flexDirection": "column", "alignItems": "center"},
+    )

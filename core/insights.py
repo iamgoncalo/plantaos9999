@@ -629,7 +629,7 @@ def _call_claude_api(prompt: str) -> str:
 
     import anthropic
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=api_key, timeout=10.0)
 
     message = client.messages.create(
         model="claude-sonnet-4-20250514",

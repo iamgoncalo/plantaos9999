@@ -8,10 +8,13 @@ from __future__ import annotations
 
 from dash import dcc, html
 
-from config.theme import SIDEBAR_WIDTH
+from config.settings import settings
 from views.components.header import create_header
 from views.components.sidebar import create_sidebar
 from views.components.zone_panel import create_zone_panel
+
+# Demo mode: 5s refresh (minimum allowed). Normal: use setting.
+_REFRESH_MS = 5_000 if settings.DEMO_MODE else settings.DATA_REFRESH_INTERVAL * 1000
 
 
 def create_layout() -> html.Div:
@@ -25,18 +28,21 @@ def create_layout() -> html.Div:
         [
             dcc.Location(id="url", refresh=False),
             dcc.Store(id="building-state-store", storage_type="memory"),
+            dcc.Store(id="sidebar-open-store", storage_type="memory", data=False),
             dcc.Interval(
                 id="data-refresh-interval",
-                interval=10 * 1000,
+                interval=_REFRESH_MS,
                 n_intervals=0,
             ),
             create_sidebar(),
+            html.Div(id="sidebar-overlay", className="sidebar-overlay"),
             html.Div(
                 [
                     create_header(),
                     html.Div(id="page-content", className="content"),
                 ],
-                style={"marginLeft": f"{SIDEBAR_WIDTH}px"},
+                className="main-content",
+                id="main-content-area",
             ),
             create_zone_panel(),
         ],

@@ -15,6 +15,7 @@ All formulas use numpy/scipy for vectorized computation.
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
@@ -388,9 +389,29 @@ def compute_perception(
     """
     cfg = config or DEFAULT_AFI_CONFIG
 
-    # N = number of adjacent zones (exits/paths)
+    # N_eff via path entropy: H = -Σ p_j log₂(p_j), N_eff = 2^H
     neighbors = _ZONE_ADJACENCY.get(zone_id, [])
-    N = max(1, len(neighbors))
+    N_raw = max(1, len(neighbors))
+
+    # Compute path probabilities from inverse edge cost
+    G = build_spatial_graph()
+    if N_raw > 1 and zone_id in G:
+        inv_costs: list[float] = []
+        for nbr in neighbors:
+            if G.has_edge(zone_id, nbr):
+                w = G[zone_id][nbr].get("weight", 1.0)
+                inv_costs.append(1.0 / max(w, 0.001))
+            else:
+                inv_costs.append(1.0)
+        total_inv = sum(inv_costs)
+        if total_inv > 0:
+            probs = [c / total_inv for c in inv_costs]
+            H = -sum(p * math.log2(p) for p in probs if p > 0)
+            N_eff = 2.0**H
+        else:
+            N_eff = float(N_raw)
+    else:
+        N_eff = float(N_raw)
 
     # T = predictive depth based on sensor quality
     sensor_depths = {
@@ -400,10 +421,10 @@ def compute_perception(
     }
     T = sensor_depths.get(sensor_type, cfg.sensor_depth_cheap_iot)
 
-    # P = log2(N) * T
-    P = math.log2(N) * T if N > 1 else 0.1 * T  # Minimum perception for dead-ends
+    # P = log2(N_eff) * T
+    P = math.log2(N_eff) * T if N_eff > 1 else 0.1 * T
 
-    return PerceptionResult(zone_id=zone_id, N=N, T=T, P=round(P, 4))
+    return PerceptionResult(zone_id=zone_id, N=N_raw, T=T, P=round(P, 4))
 
 
 def compute_distortion(
@@ -991,3 +1012,134 @@ def _compute_comfort_index(latest_reading: Any) -> float:
                 scores.append(30.0)
 
     return float(np.mean(scores)) if scores else 50.0
+
+
+# ═══════════════════════════════════════════════
+# Freedom Distortion Anomaly (FDA) Index
+# ═══════════════════════════════════════════════
+
+# Rolling buffer of freedom values per zone (last 100)
+_freedom_history: dict[str, list[float]] = defaultdict(list)
+_HISTORY_SIZE = 100
+
+
+def compute_fda(zone_id: str, F: float, tau: float = 2.0) -> float:
+    """Compute the Freedom Distortion Anomaly index.
+
+    FDA(t) = max(0, (μ_F - F(t)) / σ_F)
+    Flags anomaly when FDA > τ.
+
+    Args:
+        zone_id: Zone identifier.
+        F: Current freedom score.
+        tau: Anomaly threshold (default 2.0 sigma).
+
+    Returns:
+        FDA value (0 = normal, >τ = anomalous).
+    """
+    history = _freedom_history[zone_id]
+    history.append(F)
+    if len(history) > _HISTORY_SIZE:
+        _freedom_history[zone_id] = history[-_HISTORY_SIZE:]
+        history = _freedom_history[zone_id]
+
+    if len(history) < 5:
+        return 0.0
+
+    mu = float(np.mean(history))
+    sigma = float(np.std(history))
+    if sigma < 0.001:
+        return 0.0
+
+    return max(0.0, (mu - F) / sigma)
+
+
+def decompose_freedom_change(
+    prev_P: float,
+    prev_D: float,
+    curr_P: float,
+    curr_D: float,
+    curr_barriers: dict[str, float] | None = None,
+) -> dict:
+    """Decompose freedom change into ΔP/P and ΔD/D components.
+
+    ΔF/F ≈ ΔP/P - ΔD/D
+    Identifies the dominant barrier driving distortion change.
+
+    Args:
+        prev_P: Previous perception score.
+        prev_D: Previous distortion score.
+        curr_P: Current perception score.
+        curr_D: Current distortion score.
+        curr_barriers: Current barrier values dict.
+
+    Returns:
+        Dict with delta_P_pct, delta_D_pct, dominant_barrier, explanation.
+    """
+    delta_P_pct = ((curr_P - prev_P) / prev_P * 100) if prev_P > 0.001 else 0.0
+    delta_D_pct = ((curr_D - prev_D) / prev_D * 100) if prev_D > 0.001 else 0.0
+
+    # Identify dominant barrier
+    dominant = "none"
+    if curr_barriers:
+        worst = max(curr_barriers.items(), key=lambda x: x[1], default=("none", 1.0))
+        if worst[1] > 1.5:
+            dominant = worst[0]
+
+    # Build explanation
+    parts: list[str] = []
+    if abs(delta_D_pct) > 5:
+        direction = "increased" if delta_D_pct > 0 else "decreased"
+        parts.append(f"Distortion {direction} by {abs(delta_D_pct):.1f}%")
+        if dominant != "none":
+            parts.append(f"driven by {dominant} barrier")
+    if abs(delta_P_pct) > 5:
+        direction = "improved" if delta_P_pct > 0 else "declined"
+        parts.append(f"Perception {direction} by {abs(delta_P_pct):.1f}%")
+
+    explanation = ". ".join(parts) if parts else "Freedom stable"
+
+    return {
+        "delta_P_pct": round(delta_P_pct, 2),
+        "delta_D_pct": round(delta_D_pct, 2),
+        "dominant_barrier": dominant,
+        "explanation": explanation,
+    }
+
+
+# ═══════════════════════════════════════════════
+# Productivity KPI
+# ═══════════════════════════════════════════════
+
+# Base productivity (€/person/hr) for training center context
+_BASE_PRODUCTIVITY_EUR_HR = 25.0
+_FOCUS_FACTOR = 0.85  # fraction of time in productive work
+_DISRUPTION_COST_EUR = 2.0  # cost per disruption event
+
+
+def compute_productivity(
+    comfort_score: float,
+    n_people: int,
+    disruption_count: int = 0,
+) -> float:
+    """Compute zone productivity in €/hr.
+
+    Productivity = BaseProd × (Comfort/100) × FocusFactor × N_people
+                   - DisruptionCost × disruptions
+
+    Args:
+        comfort_score: Comfort index 0-100.
+        n_people: Number of occupants.
+        disruption_count: Number of disruption events (alerts, anomalies).
+
+    Returns:
+        Productivity value in €/hr.
+    """
+    if n_people == 0:
+        return 0.0
+
+    prod = (
+        _BASE_PRODUCTIVITY_EUR_HR * (comfort_score / 100.0) * _FOCUS_FACTOR * n_people
+    )
+    prod -= _DISRUPTION_COST_EUR * disruption_count
+    return max(0.0, round(prod, 2))

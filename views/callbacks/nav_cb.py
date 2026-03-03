@@ -463,6 +463,16 @@ def _register_notification_dropdown(
             for alert in alerts[:20]:
                 sev = alert["severity"]
                 dot_color = "#FF3B30" if sev == "critical" else "#FF9500"
+                # Route to relevant page based on alert content
+                msg = alert["message"].lower()
+                if "co" in msg or "temp" in msg or "humid" in msg:
+                    alert_href = "/comfort"
+                elif "energy" in msg or "kwh" in msg:
+                    alert_href = "/energy"
+                elif "occupan" in msg or "crowd" in msg:
+                    alert_href = "/occupancy"
+                else:
+                    alert_href = "/"
                 children.append(
                     dcc.Link(
                         html.Div(
@@ -493,7 +503,7 @@ def _register_notification_dropdown(
                                 "cursor": "pointer",
                             },
                         ),
-                        href=f"/view_2d?zone={alert.get('zone_id', '')}",
+                        href=alert_href,
                         style={
                             "textDecoration": "none",
                         },

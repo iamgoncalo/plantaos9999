@@ -372,6 +372,7 @@ def register_sensors_callbacks(app: object) -> None:
     _register_add_device(app)
     _register_commission_device(app)
     _register_remove_device(app)
+    _register_fusion_panel(app)
 
 
 def _register_inventory(app: object) -> None:
@@ -1058,3 +1059,208 @@ def _register_remove_device(app: object) -> None:
         devices = list(stored) if stored else list(_SIMULATED_DEVICES)
         devices = [d for d in devices if d.get("device_id") != selected_id]
         return devices
+
+
+# ── Monitored zone IDs for fusion diagnostics (first 8) ──
+_MONITORED_ZONES: list[str] = [
+    "f0_sala_multiusos",
+    "f0_hall",
+    "f0_biblioteca",
+    "f0_sala_formacao_1",
+    "f0_zona_social",
+    "f0_sala_informatica",
+    "f1_sala_dojo_seguranca",
+    "f1_sala_grande",
+]
+
+# Friendly display names for zone IDs
+_ZONE_DISPLAY_NAMES: dict[str, str] = {
+    "f0_sala_multiusos": "Sala Multiusos",
+    "f0_hall": "Hall",
+    "f0_biblioteca": "Biblioteca",
+    "f0_sala_formacao_1": "Sala Formacao 1",
+    "f0_zona_social": "Zona Social",
+    "f0_sala_informatica": "Sala Informatica",
+    "f1_sala_dojo_seguranca": "Sala Dojo Seguranca",
+    "f1_sala_grande": "Sala Grande",
+}
+
+
+def _register_fusion_panel(app: object) -> None:
+    """Render Kalman fusion diagnostics per monitored zone."""
+
+    @app.callback(
+        Output("sensors-fusion-content", "children"),
+        Input("building-state-store", "data"),
+    )
+    @safe_callback
+    def render_fusion_panel(
+        building_state: dict | None,
+    ) -> html.Div:
+        """Build a table-like layout showing Kalman diagnostics per zone.
+
+        Displays state estimate, uncertainty, and sensor reliability
+        for up to 8 monitored zones using core.fuse diagnostics.
+
+        Args:
+            building_state: Current building state from store.
+
+        Returns:
+            Dash component with fusion diagnostics table or awaiting message.
+        """
+        from core.fuse import get_kalman_diagnostics
+
+        rows: list[html.Tr] = []
+        for zone_id in _MONITORED_ZONES[:8]:
+            diag = get_kalman_diagnostics(zone_id)
+            temp_data = diag.get("temperature_c")
+
+            display_name = _ZONE_DISPLAY_NAMES.get(zone_id, zone_id)
+
+            if temp_data:
+                x_hat = temp_data.get("x_hat", 0.0)
+                P = temp_data.get("P", 0.0)
+                R = temp_data.get("R", 0.0)
+                # Reliability: lower P and R = more reliable
+                # Score = max(0, 100 - (P + R) * 10), clamped to 0-100
+                reliability = max(0.0, min(100.0, 100.0 - (P + R) * 10.0))
+
+                if reliability >= 80.0:
+                    rel_color = STATUS_HEALTHY
+                elif reliability >= 50.0:
+                    rel_color = STATUS_WARNING
+                else:
+                    rel_color = STATUS_CRITICAL
+
+                rows.append(
+                    html.Tr(
+                        [
+                            html.Td(
+                                display_name,
+                                style={
+                                    "padding": "10px 12px",
+                                    "fontSize": "14px",
+                                    "fontWeight": 500,
+                                    "color": TEXT_PRIMARY,
+                                },
+                            ),
+                            html.Td(
+                                f"{x_hat:.2f} \u00b0C",
+                                style={
+                                    "padding": "10px 12px",
+                                    "fontSize": "13px",
+                                    "fontFamily": "JetBrains Mono",
+                                    "color": TEXT_PRIMARY,
+                                },
+                            ),
+                            html.Td(
+                                f"\u00b1{P:.4f}",
+                                style={
+                                    "padding": "10px 12px",
+                                    "fontSize": "13px",
+                                    "fontFamily": "JetBrains Mono",
+                                    "color": TEXT_SECONDARY,
+                                },
+                            ),
+                            html.Td(
+                                html.Span(
+                                    f"{reliability:.0f}%",
+                                    style={
+                                        "fontSize": "12px",
+                                        "fontWeight": 500,
+                                        "color": rel_color,
+                                        "fontFamily": "JetBrains Mono",
+                                    },
+                                ),
+                                style={"padding": "10px 12px"},
+                            ),
+                        ],
+                        style={"borderBottom": "1px solid #F2F2F7"},
+                    )
+                )
+            else:
+                rows.append(
+                    html.Tr(
+                        [
+                            html.Td(
+                                display_name,
+                                style={
+                                    "padding": "10px 12px",
+                                    "fontSize": "14px",
+                                    "fontWeight": 500,
+                                    "color": TEXT_PRIMARY,
+                                },
+                            ),
+                            html.Td(
+                                "\u2014",
+                                style={
+                                    "padding": "10px 12px",
+                                    "fontSize": "13px",
+                                    "color": TEXT_TERTIARY,
+                                },
+                            ),
+                            html.Td(
+                                "\u2014",
+                                style={
+                                    "padding": "10px 12px",
+                                    "fontSize": "13px",
+                                    "color": TEXT_TERTIARY,
+                                },
+                            ),
+                            html.Td(
+                                "\u2014",
+                                style={
+                                    "padding": "10px 12px",
+                                    "fontSize": "13px",
+                                    "color": TEXT_TERTIARY,
+                                },
+                            ),
+                        ],
+                        style={"borderBottom": "1px solid #F2F2F7"},
+                    )
+                )
+
+        if not rows:
+            return html.Div(
+                "Fusion pipeline active \u2014 awaiting sensor data",
+                style={
+                    "color": TEXT_SECONDARY,
+                    "fontSize": "13px",
+                    "padding": "16px 0",
+                },
+            )
+
+        header_cols = [
+            "Zone",
+            "Kalman Estimate (x\u0302)",
+            "Uncertainty (P)",
+            "Reliability",
+        ]
+        header = html.Thead(
+            html.Tr(
+                [
+                    html.Th(
+                        col,
+                        style={
+                            "textAlign": "left",
+                            "padding": "8px 12px",
+                            "fontSize": "12px",
+                            "fontWeight": 600,
+                            "color": TEXT_TERTIARY,
+                            "borderBottom": "1px solid #E5E5EA",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.5px",
+                        },
+                    )
+                    for col in header_cols
+                ]
+            )
+        )
+
+        return html.Table(
+            [header, html.Tbody(rows)],
+            style={
+                "width": "100%",
+                "borderCollapse": "collapse",
+            },
+        )

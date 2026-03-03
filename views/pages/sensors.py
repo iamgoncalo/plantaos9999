@@ -238,6 +238,50 @@ def create_sensors_page() -> html.Div:
         },
     )
 
+    # Edge Fusion panel
+    fusion_section = html.Div(
+        [
+            html.Div(
+                "Edge Fusion Pipeline",
+                style={
+                    "fontSize": "15px",
+                    "fontWeight": 600,
+                    "color": TEXT_PRIMARY,
+                    "marginBottom": "8px",
+                },
+            ),
+            html.P(
+                "Real-time sensor data fusion using Kalman filtering. "
+                "Shows current state estimates, uncertainty, and sensor "
+                "health per zone.",
+                style={
+                    "fontSize": "13px",
+                    "color": TEXT_SECONDARY,
+                    "lineHeight": "1.5",
+                    "marginBottom": "16px",
+                },
+            ),
+            html.Div(
+                id="sensors-fusion-content",
+                children=html.Span(
+                    "Select a zone to view fusion diagnostics",
+                    style={
+                        "fontSize": "13px",
+                        "color": TEXT_SECONDARY,
+                    },
+                ),
+            ),
+        ],
+        id="sensors-fusion-panel",
+        className="card",
+        style={
+            "padding": f"{PADDING_CARD}px",
+            "background": BG_CARD,
+            "borderRadius": CARD_RADIUS,
+            "boxShadow": CARD_SHADOW,
+        },
+    )
+
     # Confirmation dialogs
     confirm_remove = dcc.ConfirmDialog(
         id="sensors-remove-confirm",
@@ -272,6 +316,7 @@ def create_sensors_page() -> html.Div:
                     notifications_section,
                     inventory_section,
                     health_section,
+                    fusion_section,
                 ],
                 style={
                     "display": "flex",

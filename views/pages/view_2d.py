@@ -98,11 +98,13 @@ def create_view_2d_page() -> html.Div:
         inline=True,
     )
 
-    # Overlay toggle
+    # Overlay toggle (integrates Flow and Heat views as overlays)
     overlay_selector = dcc.RadioItems(
         id="view2d-overlay-selector",
         options=[
             {"label": "None", "value": "none"},
+            {"label": "People", "value": "people"},
+            {"label": "Flow", "value": "flow"},
             {"label": "Heat", "value": "heat"},
             {"label": "Alerts", "value": "alerts"},
         ],

@@ -26,6 +26,7 @@ from config.theme import (
 from data.store import store
 from views.charts import apply_chart_theme, empty_chart
 from views.components.kpi_card import create_kpi_card
+from views.components.safe_callback import safe_callback
 
 try:
     from data.physical_ai_bridge import (
@@ -77,6 +78,7 @@ def _register_booking_analysis(app: object) -> None:
         State("url", "pathname"),
         prevent_initial_call=True,
     )
+    @safe_callback
     def analyze_booking(
         n_clicks: int | None,
         mode: str | None,
@@ -174,10 +176,16 @@ def _analyze_backward(
     )
     end_dt = start_dt + timedelta(hours=duration)
 
-    # ── Fetch historical data ──────────────────
+    # ── Fetch historical data with NaN guard ────
     energy_df = store.get_time_range("energy", start_dt, end_dt)
     comfort_df = store.get_time_range("comfort", start_dt, end_dt)
     occupancy_df = store.get_time_range("occupancy", start_dt, end_dt)
+
+    # NaN nuclear defense
+    for df in [energy_df, comfort_df, occupancy_df]:
+        if df is not None and not df.empty:
+            for col in df.select_dtypes(include=["number"]).columns:
+                df[col] = df[col].ffill().bfill().fillna(0)
 
     # Filter to selected zone
     if energy_df is not None and not energy_df.empty and "zone_id" in energy_df.columns:
@@ -425,15 +433,18 @@ def _analyze_forward(
     if HAS_PHYSICS:
         try:
             initial_state = RoomPhysicsState(
+                zone_id=zone_id,
                 temperature_c=DEFAULT_AFI_CONFIG.optimal_temperature_c,
                 co2_ppm=DEFAULT_AFI_CONFIG.optimal_co2_ppm,
+                humidity_pct=50.0,
                 occupant_count=people,
-                room_area_m2=zone_area,
-                ceiling_height_m=DEFAULT_AFI_CONFIG.ceiling_height_m,
+                hvac_power_w=2000.0,
+                ventilation_ach=2.0,
             )
             sim_result = simulate_room_physics(
                 initial_state,
-                duration_hours=duration,
+                area_m2=zone_area,
+                duration_minutes=duration * 60,
                 step_minutes=15,
             )
             temps = [s.temperature_c for s in sim_result]

@@ -30,6 +30,7 @@ from views.charts import (
     empty_chart,
 )
 from views.components.kpi_card import create_kpi_card
+from views.components.safe_callback import safe_callback
 
 
 def register_energy_callbacks(app: object) -> None:
@@ -61,7 +62,7 @@ def _get_energy_data(time_range: str) -> pd.DataFrame | None:
     ]
     for col in energy_cols:
         if col in df.columns:
-            df[col] = df[col].ffill().fillna(0)
+            df[col] = df[col].ffill().bfill().fillna(0)
     return df
 
 
@@ -74,6 +75,7 @@ def _register_energy_kpis(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_energy_kpis(time_range: str, _n: int, pathname: str | None) -> list:
         if pathname != "/energy":
             return no_update
@@ -176,6 +178,7 @@ def _register_energy_timeline(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_energy_timeline(
         time_range: str, _n: int, pathname: str | None
     ) -> go.Figure:
@@ -299,6 +302,7 @@ def _register_energy_breakdown(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_energy_breakdown(
         time_range: str, _n: int, pathname: str | None
     ) -> go.Figure:
@@ -352,6 +356,7 @@ def _register_energy_heatmap(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_energy_heatmap(
         time_range: str, _n: int, pathname: str | None
     ) -> go.Figure:
@@ -411,6 +416,7 @@ def _register_energy_scatter(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_energy_scatter(
         time_range: str, _n: int, pathname: str | None
     ) -> go.Figure:

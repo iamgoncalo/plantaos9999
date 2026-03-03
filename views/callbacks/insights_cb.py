@@ -20,6 +20,7 @@ from core.insights import (
     state_has_changed,
 )
 from views.components.insight_card import create_insight_card
+from views.components.safe_callback import safe_callback
 
 
 def register_insights_callbacks(app: object) -> None:
@@ -43,6 +44,7 @@ def _register_insight_generation(app: object) -> None:
         Input("building-state-store", "data"),
         State("insights-store", "data"),
     )
+    @safe_callback
     def generate_insights(
         _n: int,
         state_data: dict | None,
@@ -89,6 +91,7 @@ def _register_insight_feed(app: object) -> None:
         Input("insights-severity-filter", "value"),
         Input("insights-zone-filter", "value"),
     )
+    @safe_callback
     def render_feed(
         insights_data: list | None,
         severity_filter: str,
@@ -277,6 +280,7 @@ def _register_chat_send(app: object) -> None:
         State("building-state-store", "data"),
         State("chat-store", "data"),
     )
+    @safe_callback
     def send_chat(
         n_clicks: int,
         n_submit: int,
@@ -334,6 +338,7 @@ def _register_chat_render(app: object) -> None:
         Output("chat-messages", "children"),
         Input("chat-store", "data"),
     )
+    @safe_callback
     def render_chat(chat_data: list | None) -> list:
         """Map chat history to bubble components."""
         _empty = [

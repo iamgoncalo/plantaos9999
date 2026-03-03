@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dash import Input, Output, State, no_update
 from loguru import logger
+from views.components.safe_callback import safe_callback
 
 from views.floorplan.renderer_2d import render_floorplan_2d
 
@@ -32,6 +33,7 @@ def _register_floorplan_update(app: object) -> None:
         Input("view2d-floor-selector", "value"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_view_2d_floorplan(
         state_data: dict | None,
         metric: str | None,

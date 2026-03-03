@@ -26,6 +26,7 @@ from config.theme import (
 from core.simulation import SimulationEvent, SimulationResult, simulate_event
 from views.charts import apply_chart_theme, empty_chart
 from views.components.kpi_card import create_kpi_card
+from views.components.safe_callback import safe_callback
 
 
 def register_simulation_callbacks(app: object) -> None:
@@ -65,6 +66,7 @@ def _register_trigger(app: object) -> None:
         State("url", "pathname"),
         prevent_initial_call=True,
     )
+    @safe_callback
     def trigger_simulation(
         n_clicks: int | None,
         event_type: str | None,
@@ -132,6 +134,7 @@ def _register_timeline(app: object) -> None:
         State("url", "pathname"),
         prevent_initial_call=True,
     )
+    @safe_callback
     def update_timeline(
         result_data: dict | None,
         pathname: str | None,
@@ -250,6 +253,7 @@ def _register_damage_summary(app: object) -> None:
         State("url", "pathname"),
         prevent_initial_call=True,
     )
+    @safe_callback
     def update_damage_summary(
         result_data: dict | None,
         pathname: str | None,
@@ -271,7 +275,8 @@ def _register_damage_summary(app: object) -> None:
             evac_time = result_data.get("evacuation_time_seconds")
             zones_affected = result_data.get("zones_affected", [])
             timeline = result_data.get("timeline", [])
-            event_type = result_data.get("event_type", "")
+            event_data = result_data.get("event", {})
+            event_type = event_data.get("event_type", "")
 
             # Peak impact from timeline steps
             peak_impact = 1.0
@@ -313,9 +318,31 @@ def _register_damage_summary(app: object) -> None:
                     className="grid-4",
                 )
 
-            # Optimization mode: reframe as savings
-            monthly_savings = total_damage * 30
-            comfort_delta = min(peak_impact * 2, 5.0)
+            # Optimization mode: per-scenario ROI data
+            _SCENARIO_ROI = {
+                "hvac_failure": {"invest": 0, "impl": "1-3", "desc": "HVAC schedule"},
+                "open_window": {"invest": 200, "impl": "3-5", "desc": "Window sensors"},
+                "mass_entry": {"invest": 0, "impl": "1-3", "desc": "Occupancy plan"},
+                "hvac_night_off": {
+                    "invest": 0,
+                    "impl": "1-2",
+                    "desc": "Schedule change",
+                },
+                "presence_sensors": {"invest": 2400, "impl": "7-14", "desc": "Sensors"},
+                "setpoint_adjust": {"invest": 0, "impl": "1", "desc": "Config change"},
+                "zone_consolidation": {"invest": 0, "impl": "3-7", "desc": "Policy"},
+            }
+            roi = _SCENARIO_ROI.get(event_type, {})
+            invest = roi.get("invest", 0)
+
+            # For optimization scenarios total_damage IS monthly savings
+            monthly_savings = total_damage
+            annual_savings = monthly_savings * 12
+            payback = (
+                f"{invest / monthly_savings:.0f}"
+                if monthly_savings > 0 and invest > 0
+                else "0"
+            )
 
             return html.Div(
                 [
@@ -325,20 +352,20 @@ def _register_damage_summary(app: object) -> None:
                         icon="mdi:piggy-bank-outline",
                     ),
                     create_kpi_card(
-                        title="Implementation",
-                        value="7-14",
-                        unit="days",
-                        icon="mdi:clock-outline",
+                        title="Investment",
+                        value=f"€{invest:,}" if invest > 0 else "€0",
+                        icon="mdi:cash-plus",
                     ),
                     create_kpi_card(
-                        title="Comfort Impact",
-                        value=f"{comfort_delta:+.1f}°C",
-                        icon="mdi:thermometer-check",
+                        title="Payback",
+                        value=payback if invest > 0 else "Immediate",
+                        unit="months" if invest > 0 else "",
+                        icon="mdi:calendar-clock",
                     ),
                     create_kpi_card(
-                        title="Zones Affected",
-                        value=str(len(zones_affected)),
-                        icon="mdi:map-marker-alert-outline",
+                        title="Annual Savings",
+                        value=f"€{annual_savings:.0f}",
+                        icon="mdi:trending-up",
                     ),
                 ],
                 className="grid-4",
@@ -369,6 +396,7 @@ def _register_affected_zones(app: object) -> None:
         State("url", "pathname"),
         prevent_initial_call=True,
     )
+    @safe_callback
     def update_affected_zones(
         result_data: dict | None,
         pathname: str | None,

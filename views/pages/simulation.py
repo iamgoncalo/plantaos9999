@@ -181,8 +181,80 @@ def create_simulation_page() -> html.Div:
                                 ),
                                 "value": "fire",
                             },
+                            {
+                                "label": html.Span(
+                                    [
+                                        DashIconify(
+                                            icon="mdi:weather-night",
+                                            width=16,
+                                            color=ACCENT_BLUE,
+                                        ),
+                                        " Desligar AVAC à noite",
+                                    ],
+                                    style={
+                                        "display": "inline-flex",
+                                        "alignItems": "center",
+                                        "gap": "4px",
+                                    },
+                                ),
+                                "value": "hvac_night_off",
+                            },
+                            {
+                                "label": html.Span(
+                                    [
+                                        DashIconify(
+                                            icon="mdi:motion-sensor",
+                                            width=16,
+                                            color=ACCENT_BLUE,
+                                        ),
+                                        " Sensores de presença",
+                                    ],
+                                    style={
+                                        "display": "inline-flex",
+                                        "alignItems": "center",
+                                        "gap": "4px",
+                                    },
+                                ),
+                                "value": "presence_sensors",
+                            },
+                            {
+                                "label": html.Span(
+                                    [
+                                        DashIconify(
+                                            icon="mdi:thermometer-plus",
+                                            width=16,
+                                            color=STATUS_WARNING,
+                                        ),
+                                        " Ajustar setpoint +2°C",
+                                    ],
+                                    style={
+                                        "display": "inline-flex",
+                                        "alignItems": "center",
+                                        "gap": "4px",
+                                    },
+                                ),
+                                "value": "setpoint_adjust",
+                            },
+                            {
+                                "label": html.Span(
+                                    [
+                                        DashIconify(
+                                            icon="mdi:merge",
+                                            width=16,
+                                            color=ACCENT_BLUE,
+                                        ),
+                                        " Consolidar salas",
+                                    ],
+                                    style={
+                                        "display": "inline-flex",
+                                        "alignItems": "center",
+                                        "gap": "4px",
+                                    },
+                                ),
+                                "value": "zone_consolidation",
+                            },
                         ],
-                        value="hvac_failure",
+                        value="hvac_night_off",
                         className="sim-radio-group",
                         style={
                             "display": "flex",

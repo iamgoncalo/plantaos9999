@@ -14,10 +14,15 @@ import pandas as pd
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from config.building import get_zones_by_floor
+from config.building import get_zone_by_id, get_zones_by_floor
 from config.settings import settings
 from config.thresholds import evaluate_comfort
 from core.freedom_index import compute_zone_freedom
+from data.physical_ai_bridge import (
+    edge_fusion_blend,
+    get_current_physics_state,
+    simulate_room_physics,
+)
 from data.store import store
 
 
@@ -126,6 +131,47 @@ def aggregate_zone_state(
     if energy_df is not None and not energy_df.empty:
         latest_energy = energy_df.sort_values("timestamp").iloc[-1]
         total_energy = float(latest_energy.get("total_kwh", 0))
+
+    # ── Edge Fusion: blend sensor data with physics model ──
+    try:
+        zone_info = get_zone_by_id(zone_id)
+        zone_area = zone_info.area_m2 if zone_info else 40.0
+        has_sensor = zone_info.has_sensors if zone_info else False
+
+        # Determine sensor confidence based on data freshness
+        sensor_confidence = 0.0
+        if comfort_df is not None and not comfort_df.empty:
+            latest_ts = comfort_df["timestamp"].max()
+            age_minutes = (now - latest_ts).total_seconds() / 60
+            if age_minutes < 5:
+                sensor_confidence = 0.9
+            elif age_minutes < 30:
+                sensor_confidence = 0.5
+            elif age_minutes < 120:
+                sensor_confidence = 0.1
+        elif not has_sensor:
+            sensor_confidence = 0.0
+
+        # Run physics model for 1-step prediction
+        if sensor_confidence < 0.9:
+            physics_state = get_current_physics_state(zone_id)
+            sim_states = simulate_room_physics(
+                physics_state, zone_area, duration_minutes=5, step_minutes=5
+            )
+            if sim_states:
+                sim_latest = sim_states[-1]
+                if temp_c is not None:
+                    temp_c = edge_fusion_blend(
+                        sim_latest.temperature_c, temp_c, sensor_confidence
+                    )
+                else:
+                    temp_c = sim_latest.temperature_c
+                if co2 is not None:
+                    co2 = edge_fusion_blend(sim_latest.co2_ppm, co2, sensor_confidence)
+                else:
+                    co2 = sim_latest.co2_ppm
+    except Exception as exc:
+        logger.debug(f"Edge fusion skipped for {zone_id}: {exc}")
 
     # Compute freedom index
     freedom = compute_zone_freedom(zone_id)

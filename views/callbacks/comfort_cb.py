@@ -29,6 +29,7 @@ from views.charts import (
     empty_chart,
 )
 from views.components.kpi_card import create_kpi_card
+from views.components.safe_callback import safe_callback
 
 
 def register_comfort_callbacks(app: object) -> None:
@@ -62,7 +63,7 @@ def _get_comfort_data(
     numeric_cols = ["temperature_c", "humidity_pct", "co2_ppm", "illuminance_lux"]
     for col in numeric_cols:
         if col in df.columns:
-            df[col] = df[col].ffill().fillna(0)
+            df[col] = df[col].ffill().bfill().fillna(0)
     return df
 
 
@@ -80,6 +81,7 @@ def _register_comfort_kpis(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_comfort_kpis(
         zones: list[str] | None, _n: int, pathname: str | None
     ) -> list:
@@ -159,6 +161,7 @@ def _register_comfort_temperature(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_comfort_temperature(
         zones: list[str] | None, _n: int, pathname: str | None
     ) -> go.Figure:
@@ -229,6 +232,7 @@ def _register_comfort_matrix(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_comfort_matrix(
         zones: list[str] | None, _n: int, pathname: str | None
     ) -> go.Figure:
@@ -317,6 +321,7 @@ def _register_comfort_co2_scatter(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_co2_scatter(
         zones: list[str] | None, _n: int, pathname: str | None
     ) -> go.Figure:
@@ -427,6 +432,7 @@ def _register_comfort_humidity(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_humidity_violin(
         zones: list[str] | None, _n: int, pathname: str | None
     ) -> go.Figure:

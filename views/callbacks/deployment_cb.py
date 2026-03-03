@@ -15,6 +15,7 @@ from loguru import logger
 from config.afi_config import AFIConfig, DEFAULT_AFI_CONFIG
 from core.afi_engine import compute_building_afi
 from views.components.kpi_card import create_kpi_card
+from views.components.safe_callback import safe_callback
 
 
 def register_deployment_callbacks(app: object) -> None:
@@ -41,6 +42,7 @@ def _register_config_update(app: object) -> None:
         Input("deploy-w-exit", "value"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_config_store(
         cost_kwh: float,
         wage: float,
@@ -91,6 +93,7 @@ def _register_impact_preview(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_impact_preview(
         config_data: dict | None,
         n_intervals: int | None,
@@ -266,6 +269,7 @@ def _register_roi_calculator(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_roi(
         sensor_count: int | None,
         sensor_cost: float | None,

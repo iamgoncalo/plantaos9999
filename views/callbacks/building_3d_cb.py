@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dash import Input, Output, State, no_update
 from loguru import logger
+from views.components.safe_callback import safe_callback
 
 
 def register_3d_callbacks(app: object) -> None:
@@ -30,6 +31,7 @@ def _register_3d_update(app: object) -> None:
         Input("3d-floor-selector", "value"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_3d_view(
         state_data: dict | None,
         metric: str | None,

@@ -9,6 +9,7 @@ from __future__ import annotations
 from dash import Input, Output, State, html, no_update
 from dash.exceptions import PreventUpdate
 from loguru import logger
+from views.components.safe_callback import safe_callback
 
 
 def register_admin_callbacks(app: object) -> None:
@@ -34,6 +35,7 @@ def _register_save_settings(app: object) -> None:
         State("url", "pathname"),
         prevent_initial_call=True,
     )
+    @safe_callback
     def save_settings(
         n_clicks: int | None,
         energy_cost: float | None,
@@ -86,6 +88,7 @@ def _register_regen_data(app: object) -> None:
         Input("admin-regen-btn", "n_clicks"),
         prevent_initial_call=True,
     )
+    @safe_callback
     def regen_data(n_clicks: int | None) -> html.Span:
         """Queue data regeneration and return user feedback.
 

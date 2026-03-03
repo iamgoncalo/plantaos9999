@@ -71,10 +71,10 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     if "timestamp" in df.columns:
         df = df.sort_values("timestamp").reset_index(drop=True)
 
-    # Forward-fill small NaN gaps in numeric columns
+    # Forward-fill small NaN gaps in numeric columns, backfill leading NaN, zero remaining
     numeric_cols = df.select_dtypes(include=["number"]).columns
     if len(numeric_cols) > 0:
-        df[numeric_cols] = df[numeric_cols].ffill(limit=3)
+        df[numeric_cols] = df[numeric_cols].ffill(limit=3).bfill(limit=1).fillna(0)
 
     # Drop remaining rows with NaN in critical columns
     df = df.dropna(subset=["timestamp"] if "timestamp" in df.columns else [])

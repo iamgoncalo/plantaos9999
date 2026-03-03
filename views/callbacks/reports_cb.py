@@ -22,6 +22,7 @@ from data.store import store
 from utils.time_utils import get_period_range
 from views.charts import TIME_RANGE_MAP, apply_chart_theme, empty_chart
 from views.components.kpi_card import create_kpi_card
+from views.components.safe_callback import safe_callback
 
 
 # ── Period → hours mapping ────────────────────
@@ -55,6 +56,7 @@ def _register_reports_kpis(app: object) -> None:
         Input("reports-period", "value"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_reports_kpis(_n: int, period: str, pathname: str | None) -> list:
         if pathname != "/reports":
             return no_update
@@ -143,6 +145,7 @@ def _register_breakdown_pie(app: object) -> None:
         Input("reports-period", "value"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_breakdown_pie(_n: int, period: str, pathname: str | None) -> go.Figure:
         if pathname != "/reports":
             return no_update
@@ -196,6 +199,7 @@ def _register_trend_line(app: object) -> None:
         Input("reports-period", "value"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_trend_line(_n: int, period: str, pathname: str | None) -> go.Figure:
         if pathname != "/reports":
             return no_update
@@ -209,8 +213,12 @@ def _register_trend_line(app: object) -> None:
 
             cfg = DEFAULT_AFI_CONFIG
 
-            # Group by day and compute daily cost
+            # NaN guard
             energy_df = energy_df.copy()
+            for col in energy_df.select_dtypes(include=["number"]).columns:
+                energy_df[col] = energy_df[col].ffill().bfill().fillna(0)
+
+            # Group by day and compute daily cost
             energy_df["date"] = energy_df["timestamp"].dt.date
             daily = energy_df.groupby("date")["total_kwh"].sum().reset_index()
             daily["cost_eur"] = daily["total_kwh"] * cfg.cost_per_kwh
@@ -260,6 +268,7 @@ def _register_zone_ranking(app: object) -> None:
         Input("reports-period", "value"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_zone_ranking(_n: int, period: str, pathname: str | None) -> go.Figure:
         if pathname != "/reports":
             return no_update
@@ -314,6 +323,7 @@ def _register_savings_chart(app: object) -> None:
         Input("reports-period", "value"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_savings_chart(_n: int, period: str, pathname: str | None) -> go.Figure:
         if pathname != "/reports":
             return no_update
@@ -327,6 +337,8 @@ def _register_savings_chart(app: object) -> None:
 
             cfg = DEFAULT_AFI_CONFIG
             energy_df = energy_df.copy()
+            for col in energy_df.select_dtypes(include=["number"]).columns:
+                energy_df[col] = energy_df[col].ffill().bfill().fillna(0)
             energy_df["date"] = energy_df["timestamp"].dt.date
 
             daily = energy_df.groupby("date")["total_kwh"].sum().reset_index()
@@ -380,6 +392,7 @@ def _register_pdf_download(app: object) -> None:
         State("url", "pathname"),
         prevent_initial_call=True,
     )
+    @safe_callback
     def download_report(
         n_clicks: int | None, period: str, pathname: str | None
     ) -> dict | None:

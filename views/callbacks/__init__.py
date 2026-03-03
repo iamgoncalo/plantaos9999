@@ -11,6 +11,8 @@ from dash import Input, Output, State, html, no_update
 from dash_iconify import DashIconify
 from loguru import logger
 
+from views.components.safe_callback import safe_callback
+
 from views.callbacks.admin_cb import register_admin_callbacks
 from views.callbacks.booking_cb import register_booking_callbacks
 from views.callbacks.building_3d_cb import register_3d_callbacks
@@ -83,6 +85,7 @@ def _register_routing_callback(app: object) -> None:
         Output("header-title", "children"),
         Input("url", "pathname"),
     )
+    @safe_callback
     def route_page(pathname: str) -> tuple:
         """Route URL pathname to the correct page component."""
         try:
@@ -200,6 +203,7 @@ def _register_building_state_callback(app: object) -> None:
         Output("building-state-store", "data"),
         Input("data-refresh-interval", "n_intervals"),
     )
+    @safe_callback
     def refresh_building_state(_n: int) -> dict:
         """Compute and store building state."""
         try:
@@ -219,6 +223,7 @@ def _register_overview_kpi_callback(app: object) -> None:
         Output("overview-kpi-grid", "children"),
         Input("building-state-store", "data"),
     )
+    @safe_callback
     def update_kpis(state_data: dict | None) -> list:
         """Regenerate KPI cards with live data."""
         from utils.formatters import format_energy
@@ -290,6 +295,7 @@ def _register_floorplan_callback(app: object) -> None:
         Input("building-state-store", "data"),
         Input("active-floor-store", "data"),
     )
+    @safe_callback
     def update_floorplan(state_data: dict | None, active_floor: int | None):
         """Re-render floorplan with current zone data."""
         try:
@@ -351,6 +357,7 @@ def _register_zone_click_callback(app: object) -> None:
         Input("floorplan-graph", "clickData"),
         State("building-state-store", "data"),
     )
+    @safe_callback
     def show_zone_detail(
         click_data: dict | None,
         state_data: dict | None,
@@ -402,6 +409,7 @@ def _register_alert_feed_callback(app: object) -> None:
         Output("overview-alert-feed", "children"),
         Input("building-state-store", "data"),
     )
+    @safe_callback
     def update_alert_feed(state_data: dict | None):
         """Generate alerts from zones with warning/critical status."""
         from views.components.alert_feed import create_alert_feed

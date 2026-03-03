@@ -32,6 +32,7 @@ from views.charts import (
     empty_chart,
 )
 from views.components.kpi_card import create_kpi_card
+from views.components.safe_callback import safe_callback
 
 
 def register_occupancy_callbacks(app: object) -> None:
@@ -56,7 +57,7 @@ def _get_occ_data(time_range: str) -> pd.DataFrame | None:
         return None
     for col in ["occupant_count", "occupancy_ratio"]:
         if col in df.columns:
-            df[col] = df[col].ffill().fillna(0)
+            df[col] = df[col].ffill().bfill().fillna(0)
     return df
 
 
@@ -69,6 +70,7 @@ def _register_occ_kpis(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_occ_kpis(time_range: str, _n: int, pathname: str | None) -> list:
         if pathname != "/occupancy":
             return no_update
@@ -151,6 +153,7 @@ def _register_occ_timeline(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_occ_timeline(
         time_range: str, _n: int, pathname: str | None
     ) -> go.Figure:
@@ -253,6 +256,7 @@ def _register_occ_heatmap(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_occ_heatmap(time_range: str, _n: int, pathname: str | None) -> go.Figure:
         if pathname != "/occupancy":
             return no_update
@@ -316,6 +320,7 @@ def _register_occ_sankey(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_occ_sankey(time_range: str, _n: int, pathname: str | None) -> go.Figure:
         if pathname != "/occupancy":
             return no_update
@@ -433,6 +438,7 @@ def _register_occ_efficiency(app: object) -> None:
         Input("data-refresh-interval", "n_intervals"),
         State("url", "pathname"),
     )
+    @safe_callback
     def update_occ_efficiency(
         time_range: str, _n: int, pathname: str | None
     ) -> go.Figure:

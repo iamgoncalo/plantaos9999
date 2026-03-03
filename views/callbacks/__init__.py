@@ -14,6 +14,7 @@ from dash import Input, Output, State, ctx, html
 from utils.time_utils import current_shift
 from views.callbacks.comfort_cb import register_comfort_callbacks
 from views.callbacks.energy_cb import register_energy_callbacks
+from views.callbacks.insights_cb import register_insights_callbacks
 from views.callbacks.occupancy_cb import register_occupancy_callbacks
 
 
@@ -55,6 +56,7 @@ def register_callbacks(app: object) -> None:
     register_energy_callbacks(app)
     register_comfort_callbacks(app)
     register_occupancy_callbacks(app)
+    register_insights_callbacks(app)
 
 
 def _register_routing_callback(app: object) -> None:

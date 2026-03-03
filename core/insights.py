@@ -1,17 +1,20 @@
 """AI-powered insights via Claude API.
 
 Sends anomaly context and building state to the Anthropic API
-and returns natural language explanations and recommendations.
-Falls back to template-based insights if the API is unavailable.
+and returns structured Insight models with titles, explanations,
+and recommended actions. Falls back to template-based insights
+if the API is unavailable.
 """
 
 from __future__ import annotations
 
+import json
 import time
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from loguru import logger
+from pydantic import BaseModel
 
 from config.building import get_zone_by_id
 from config.settings import settings
@@ -20,6 +23,9 @@ from data.store import store
 # Rate limiting: max 1 API call per 5 minutes
 _last_api_call: float = 0.0
 _API_COOLDOWN_SECONDS = 300
+
+# Change detection for insight generation
+_last_state_hash: str = ""
 
 # System prompt for PlantaOS insight generation
 _SYSTEM_PROMPT = """You are PlantaOS, the intelligent operating system for the Centro de Formação \
@@ -41,14 +47,47 @@ Building context:
 - March weather in Aveiro: 8-18°C, occasional rain"""
 
 
+class Insight(BaseModel):
+    """A structured AI-generated insight about building operations."""
+
+    title: str
+    explanation: str
+    severity: str = "info"  # 'info', 'warning', 'critical'
+    affected_zones: list[str] = []
+    recommended_action: str = ""
+    category: str = "general"  # 'energy', 'comfort', 'occupancy', 'general'
+    timestamp: str = ""
+
+
+def state_has_changed(state_data: dict) -> bool:
+    """Check if building state has changed significantly.
+
+    Args:
+        state_data: Building state dict from BuildingState.model_dump().
+
+    Returns:
+        True if state changed enough to warrant new insights.
+    """
+    global _last_state_hash
+    key = (
+        f"{state_data.get('active_alerts', 0)}_"
+        f"{state_data.get('total_energy_kwh', 0):.0f}_"
+        f"{state_data.get('avg_freedom_index', 0):.0f}"
+    )
+    if key == _last_state_hash:
+        return False
+    _last_state_hash = key
+    return True
+
+
 def generate_insight(
     anomaly: dict[str, Any],
     context: dict[str, Any] | None = None,
-) -> str:
-    """Generate a natural language insight for an anomaly.
+) -> Insight:
+    """Generate a structured insight for an anomaly.
 
-    Sends context to Claude API and returns an explanation with
-    recommendations. Falls back to a template if API is unavailable.
+    Sends context to Claude API and returns an Insight model.
+    Falls back to a template if API is unavailable.
 
     Args:
         anomaly: Dict describing the anomaly (zone, metric, value,
@@ -56,15 +95,149 @@ def generate_insight(
         context: Optional building-wide context for richer insights.
 
     Returns:
-        Natural language insight string.
+        Insight model with title, explanation, and recommendation.
     """
-    prompt = _build_prompt(anomaly, context)
+    prompt = _build_structured_prompt(anomaly, context)
+    now_str = datetime.now().isoformat()
+    zone_id = anomaly.get("zone_id", "unknown")
+    metric = anomaly.get("metric", "unknown")
+    severity = anomaly.get("severity", "info")
+    category = _metric_to_category(metric)
+
+    try:
+        response = _call_claude_api(prompt)
+        return _parse_insight_response(response, zone_id, severity, category, now_str)
+    except Exception as e:
+        logger.debug(f"API unavailable, using fallback: {e}")
+        return _fallback_insight(anomaly, now_str)
+
+
+def generate_building_insights(
+    building_state_data: dict,
+) -> list[Insight]:
+    """Scan building state for anomalous zones and generate insights.
+
+    Args:
+        building_state_data: Building state dict from
+            BuildingState.model_dump(mode="json").
+
+    Returns:
+        List of Insight models for zones with warning/critical status.
+    """
+    insights: list[Insight] = []
+    now_str = datetime.now().isoformat()
+
+    for floor_state in building_state_data.get("floors", []):
+        for zone in floor_state.get("zones", []):
+            status = zone.get("status", "unknown")
+            if status not in ("warning", "critical"):
+                continue
+
+            zone_id = zone.get("zone_id", "unknown")
+            zone_info = get_zone_by_id(zone_id)
+            zone_name = zone_info.name if zone_info else zone_id
+
+            # Build anomaly dict from zone state
+            anomaly_data = _zone_state_to_anomaly(zone, zone_name)
+
+            # Context from building state
+            ctx = {
+                "total_occupancy": building_state_data.get("total_occupancy", 0),
+            }
+
+            # Try Claude for first insight, fallback for the rest
+            if not insights:
+                insight = generate_insight(anomaly_data, ctx)
+            else:
+                insight = _fallback_insight(anomaly_data, now_str)
+
+            insights.append(insight)
+
+    # If no anomalous zones, generate a healthy building insight
+    if not insights:
+        freedom = building_state_data.get("avg_freedom_index", 0)
+        energy = building_state_data.get("total_energy_kwh", 0)
+        occ = building_state_data.get("total_occupancy", 0)
+        insights.append(
+            Insight(
+                title="Building operating normally",
+                explanation=(
+                    f"All zones are within acceptable parameters. "
+                    f"Building health index is {freedom:.0f}/100 with "
+                    f"{occ} people and {energy:.1f} kWh total consumption."
+                ),
+                severity="info",
+                category="general",
+                timestamp=now_str,
+            )
+        )
+
+    return insights
+
+
+def answer_building_question(
+    question: str,
+    building_state: dict | None = None,
+) -> str:
+    """Answer a user question about the building using Claude.
+
+    Args:
+        question: User's natural language question.
+        building_state: Current building state for context.
+
+    Returns:
+        Answer string from Claude or fallback message.
+    """
+    # Build context summary
+    ctx_parts = ["Current building state:"]
+
+    if building_state:
+        ctx_parts.append(
+            f"  Total occupancy: {building_state.get('total_occupancy', '?')}"
+        )
+        ctx_parts.append(
+            f"  Total energy: {building_state.get('total_energy_kwh', 0):.1f} kWh"
+        )
+        ctx_parts.append(
+            f"  Building health: {building_state.get('avg_freedom_index', 0):.0f}/100"
+        )
+        ctx_parts.append(f"  Active alerts: {building_state.get('active_alerts', 0)}")
+
+        for floor in building_state.get("floors", []):
+            floor_num = floor.get("floor", "?")
+            ctx_parts.append(
+                f"\n  Floor {floor_num}: "
+                f"{floor.get('avg_temperature', 0):.1f}°C avg, "
+                f"{floor.get('total_occupancy', 0)} people, "
+                f"{floor.get('total_energy_kwh', 0):.1f} kWh"
+            )
+            for z in floor.get("zones", []):
+                if z.get("status") in ("warning", "critical"):
+                    zone_info = get_zone_by_id(z["zone_id"])
+                    name = zone_info.name if zone_info else z["zone_id"]
+                    ctx_parts.append(
+                        f"    ⚠ {name}: {z.get('status')} — "
+                        f"{z.get('temperature_c', '?')}°C, "
+                        f"CO₂ {z.get('co2_ppm', '?')} ppm"
+                    )
+
+    context_text = "\n".join(ctx_parts)
+    prompt = (
+        f"{context_text}\n\n"
+        f"User question: {question}\n\n"
+        f"Answer concisely (2-4 sentences), referencing specific zones "
+        f"and metrics where relevant."
+    )
 
     try:
         return _call_claude_api(prompt)
     except Exception as e:
-        logger.debug(f"API unavailable, using fallback: {e}")
-        return _fallback_insight(anomaly)
+        logger.debug(f"Chat API unavailable: {e}")
+        return (
+            "I'm unable to process your question right now. "
+            "Please check the dashboard for current building data, "
+            "or try again in a few minutes."
+        )
 
 
 def generate_daily_summary(target_date: date | None = None) -> str:
@@ -79,7 +252,6 @@ def generate_daily_summary(target_date: date | None = None) -> str:
     if target_date is None:
         target_date = date.today()
 
-    # Gather day's data
     energy_df = store.get("energy")
     comfort_df = store.get("comfort")
     occ_df = store.get("occupancy")
@@ -117,7 +289,6 @@ def generate_daily_summary(target_date: date | None = None) -> str:
                 f"Outdoor: {outdoor_temp:.1f}°C avg, {rain_pct:.0f}% rain periods"
             )
 
-    # Try Claude API for richer summary
     context_text = "\n".join(summary_parts)
     prompt = (
         f"Based on this building data, provide a brief 3-4 sentence summary "
@@ -170,7 +341,6 @@ def generate_zone_analysis(zone_id: str) -> str:
             f"peak {occ_df['occupant_count'].max()}"
         )
 
-    # Try API
     prompt = (
         "Analyze this zone data and provide 2-3 actionable insights:\n\n"
         + "\n".join(parts)
@@ -182,11 +352,14 @@ def generate_zone_analysis(zone_id: str) -> str:
         return "\n".join(parts)
 
 
-def _build_prompt(
+# ── Private helpers ─────────────────────────────────
+
+
+def _build_structured_prompt(
     anomaly: dict[str, Any],
     context: dict[str, Any] | None = None,
 ) -> str:
-    """Construct the prompt for the Claude API.
+    """Construct a prompt requesting structured JSON insight.
 
     Args:
         anomaly: Anomaly details.
@@ -217,12 +390,217 @@ def _build_prompt(
         if "is_raining" in context:
             parts.append(f"  Raining: {'Yes' if context['is_raining'] else 'No'}")
 
+    parts.append("\nRespond ONLY with a JSON object (no markdown, no extra text):")
     parts.append(
-        "\nExplain this anomaly, identify the likely cause, "
-        "and suggest a corrective action in 2-3 sentences."
+        '{"title": "<max 10 words>", '
+        '"explanation": "<2-3 sentences>", '
+        '"severity": "<info|warning|critical>", '
+        '"recommended_action": "<specific action>"}'
     )
 
     return "\n".join(parts)
+
+
+def _parse_insight_response(
+    response: str,
+    zone_id: str,
+    severity: str,
+    category: str,
+    timestamp: str,
+) -> Insight:
+    """Parse Claude's JSON response into an Insight model.
+
+    Args:
+        response: Raw API response text.
+        zone_id: Zone the anomaly was detected in.
+        severity: Original anomaly severity.
+        category: Insight category.
+        timestamp: ISO timestamp.
+
+    Returns:
+        Parsed Insight model.
+    """
+    try:
+        # Try to extract JSON from response
+        text = response.strip()
+        # Handle responses wrapped in markdown code blocks
+        if text.startswith("```"):
+            lines = text.split("\n")
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+        data = json.loads(text)
+        return Insight(
+            title=data.get("title", "Anomaly Detected"),
+            explanation=data.get("explanation", response),
+            severity=data.get("severity", severity),
+            affected_zones=[zone_id],
+            recommended_action=data.get("recommended_action", ""),
+            category=category,
+            timestamp=timestamp,
+        )
+    except (json.JSONDecodeError, KeyError):
+        # Fallback: use raw response as explanation
+        return Insight(
+            title="Anomaly Detected",
+            explanation=response[:300],
+            severity=severity,
+            affected_zones=[zone_id],
+            recommended_action="Review zone conditions and sensor data.",
+            category=category,
+            timestamp=timestamp,
+        )
+
+
+def _zone_state_to_anomaly(zone: dict[str, Any], zone_name: str) -> dict[str, Any]:
+    """Convert a zone state dict into an anomaly-style dict.
+
+    Args:
+        zone: Zone state from BuildingState.
+        zone_name: Display name of the zone.
+
+    Returns:
+        Dict formatted for generate_insight().
+    """
+    # Determine primary metric that triggered the status
+    metric = "comfort"
+    value: Any = "—"
+    expected: Any = "—"
+
+    temp = zone.get("temperature_c")
+    co2 = zone.get("co2_ppm")
+    humidity = zone.get("humidity_pct")
+
+    if co2 is not None and co2 > 1000:
+        metric = "co2_ppm"
+        value = co2
+        expected = 600
+    elif temp is not None and (temp > 26 or temp < 18):
+        metric = "temperature_c"
+        value = temp
+        expected = 22
+    elif humidity is not None and (humidity > 70 or humidity < 30):
+        metric = "humidity_pct"
+        value = humidity
+        expected = 50
+
+    return {
+        "zone_id": zone.get("zone_id", "unknown"),
+        "zone_name": zone_name,
+        "metric": metric,
+        "value": value,
+        "expected": expected,
+        "deviation": 2.5,
+        "severity": zone.get("status", "warning"),
+    }
+
+
+def _fallback_insight(
+    anomaly: dict[str, Any],
+    timestamp: str | None = None,
+) -> Insight:
+    """Generate a template-based insight when API is unavailable.
+
+    Args:
+        anomaly: Anomaly details.
+        timestamp: ISO timestamp. Defaults to now.
+
+    Returns:
+        Insight model with template-based content.
+    """
+    if timestamp is None:
+        timestamp = datetime.now().isoformat()
+
+    zone_id = anomaly.get("zone_id", "unknown")
+    zone = get_zone_by_id(zone_id)
+    zone_name = zone.name if zone else zone_id
+    metric = anomaly.get("metric", "unknown")
+    value = anomaly.get("value", "?")
+    expected = anomaly.get("expected", "?")
+    severity = anomaly.get("severity", "info")
+    deviation = anomaly.get("deviation", 0)
+    category = _metric_to_category(metric)
+
+    templates: dict[str, tuple[str, str, str]] = {
+        "temperature": (
+            f"Temperature alert in {zone_name}",
+            f"Temperature is {value}°C (expected ~{expected}°C, "
+            f"{abs(deviation) if isinstance(deviation, (int, float)) else 0:.1f}σ deviation). "
+            f"{'This exceeds comfort thresholds and may affect occupant wellbeing.' if severity != 'info' else 'Minor variation within normal range.'}",
+            "Check HVAC system operation and thermostat settings.",
+        ),
+        "humidity": (
+            f"Humidity anomaly in {zone_name}",
+            f"Humidity is at {value}% (expected ~{expected}%, "
+            f"{abs(deviation) if isinstance(deviation, (int, float)) else 0:.1f}σ deviation). "
+            f"{'Out-of-range humidity can affect comfort and equipment.' if severity != 'info' else 'Within acceptable range.'}",
+            "Check for open windows or ventilation issues.",
+        ),
+        "co2": (
+            f"CO₂ levels elevated in {zone_name}",
+            f"CO₂ levels are {value} ppm (expected ~{expected} ppm). "
+            f"{'High CO₂ indicates insufficient ventilation relative to occupancy.' if severity != 'info' else 'CO₂ levels are normal.'}",
+            "Increase ventilation or check air handling unit.",
+        ),
+        "illuminance": (
+            f"Lighting anomaly in {zone_name}",
+            f"Light levels are {value} lux (expected ~{expected} lux). "
+            f"{'Incorrect lighting can reduce productivity and increase energy waste.' if severity != 'info' else 'Lighting is adequate.'}",
+            "Check lighting controls and window shading.",
+        ),
+        "energy": (
+            f"Energy spike in {zone_name}",
+            f"Energy consumption is {value} kWh (expected ~{expected} kWh, "
+            f"{abs(deviation) if isinstance(deviation, (int, float)) else 0:.1f}σ deviation). "
+            f"{'Unexplained consumption spikes may indicate equipment issues.' if severity != 'info' else 'Consumption is within normal range.'}",
+            "Investigate for equipment left running or HVAC malfunction.",
+        ),
+    }
+
+    # Match metric to template key
+    template_key = metric
+    for key in templates:
+        if key in metric.lower():
+            template_key = key
+            break
+
+    if template_key in templates:
+        title, explanation, action = templates[template_key]
+    else:
+        title = f"Anomaly in {zone_name}"
+        explanation = (
+            f"{metric} = {value} (expected {expected}, severity: {severity}). "
+            f"Review sensor data and check zone conditions."
+        )
+        action = "Review sensor data and investigate zone conditions."
+
+    return Insight(
+        title=title,
+        explanation=explanation,
+        severity=severity,
+        affected_zones=[zone_id],
+        recommended_action=action,
+        category=category,
+        timestamp=timestamp,
+    )
+
+
+def _metric_to_category(metric: str) -> str:
+    """Map a metric name to an insight category.
+
+    Args:
+        metric: Metric name (e.g., 'temperature_c', 'co2_ppm').
+
+    Returns:
+        Category string: 'energy', 'comfort', 'occupancy', or 'general'.
+    """
+    metric_lower = metric.lower()
+    if any(k in metric_lower for k in ("kwh", "energy", "power")):
+        return "energy"
+    if any(k in metric_lower for k in ("temp", "humid", "co2", "illumin", "comfort")):
+        return "comfort"
+    if any(k in metric_lower for k in ("occupan", "count", "presence")):
+        return "occupancy"
+    return "general"
 
 
 def _call_claude_api(prompt: str) -> str:
@@ -263,64 +641,3 @@ def _call_claude_api(prompt: str) -> str:
     _last_api_call = time.time()
 
     return message.content[0].text
-
-
-def _fallback_insight(anomaly: dict[str, Any]) -> str:
-    """Generate a template-based insight when API is unavailable.
-
-    Args:
-        anomaly: Anomaly details.
-
-    Returns:
-        Template-based insight string.
-    """
-    zone_id = anomaly.get("zone_id", "unknown")
-    zone = get_zone_by_id(zone_id)
-    zone_name = zone.name if zone else zone_id
-    metric = anomaly.get("metric", "unknown")
-    value = anomaly.get("value", "?")
-    expected = anomaly.get("expected", "?")
-    severity = anomaly.get("severity", "info")
-    deviation = anomaly.get("deviation", 0)
-
-    templates = {
-        "temperature": (
-            f"Temperature in {zone_name} is {value}°C "
-            f"(expected ~{expected}°C, {abs(deviation):.1f}σ deviation). "
-            f"{'Check HVAC system operation and thermostat settings.' if severity != 'info' else 'Minor variation within normal range.'}"
-        ),
-        "humidity": (
-            f"Humidity in {zone_name} is at {value}% "
-            f"(expected ~{expected}%, {abs(deviation):.1f}σ deviation). "
-            f"{'Check for open windows or ventilation issues.' if severity != 'info' else 'Within acceptable range.'}"
-        ),
-        "co2": (
-            f"CO2 levels in {zone_name} are {value} ppm "
-            f"(expected ~{expected} ppm). "
-            f"{'Increase ventilation or check air handling unit.' if severity != 'info' else 'CO2 levels are normal.'}"
-        ),
-        "illuminance": (
-            f"Light levels in {zone_name} are {value} lux "
-            f"(expected ~{expected} lux). "
-            f"{'Check lighting controls and window shading.' if severity != 'info' else 'Lighting is adequate.'}"
-        ),
-        "energy": (
-            f"Energy consumption in {zone_name} is {value} kWh "
-            f"(expected ~{expected} kWh, {abs(deviation):.1f}σ deviation). "
-            f"{'Investigate for equipment left running or HVAC malfunction.' if severity != 'info' else 'Consumption is within normal range.'}"
-        ),
-    }
-
-    # Match metric to template key
-    template_key = metric
-    for key in templates:
-        if key in metric.lower():
-            template_key = key
-            break
-
-    return templates.get(
-        template_key,
-        f"Anomaly detected in {zone_name}: {metric} = {value} "
-        f"(expected {expected}, severity: {severity}). "
-        f"Review sensor data and check zone conditions.",
-    )

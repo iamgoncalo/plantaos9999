@@ -49,6 +49,9 @@ pytest-cov>=4.1.0
 ruff>=0.3.0
 pre-commit>=3.6.0
 
+# ── PDF Reports ──────────────────────────────
+reportlab>=4.0                    # Real PDF generation for financial reports
+
 # ── Optional: 3D Enhancement ─────────────────
 trimesh>=4.0.0                    # 3D mesh generation for building geometry
 shapely>=2.0.0                    # 2D geometry for floorplan zones

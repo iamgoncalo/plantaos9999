@@ -24,6 +24,10 @@ from views.callbacks.occupancy_cb import register_occupancy_callbacks
 from views.callbacks.reports_cb import register_reports_callbacks
 from views.callbacks.simulation_cb import register_simulation_callbacks
 from views.callbacks.view_2d_cb import register_view_2d_callbacks
+from views.callbacks.view_4d_cb import register_view_4d_callbacks
+from views.callbacks.view_data_cb import register_data_explorer_callbacks
+from views.callbacks.view_emergency_cb import register_emergency_callbacks
+from views.callbacks.view_sensors_cb import register_sensor_coverage_callbacks
 
 
 # Page title mapping: pathname → display title
@@ -33,10 +37,13 @@ _PAGE_TITLES: dict[str, str] = {
     "/energy": "Energy",
     "/comfort": "Comfort",
     "/occupancy": "Occupancy",
-    "/insights": "System Intelligence",
+    "/insights": "Guidance",
     "/building_3d": "3D Building",
     "/view_2d": "2D Map",
-    "/view_4d": "4D Simulation",
+    "/view_4d": "4D Explorer",
+    "/view_sensors": "Sensor Coverage",
+    "/view_emergency": "Emergency Mode",
+    "/view_data": "Data Explorer",
     "/simulation": "Simulation",
     "/reports": "Reports",
     "/deployment": "Deployment",
@@ -65,6 +72,8 @@ def register_callbacks(app: object) -> None:
     _register_view_submenu_toggle(app)
     _register_tenant_sync(app)
     _register_search_callback(app)
+    _register_notification_dropdown(app)
+    _register_lang_selector(app)
     # Detail page callbacks
     register_energy_callbacks(app)
     register_comfort_callbacks(app)
@@ -76,6 +85,10 @@ def register_callbacks(app: object) -> None:
     register_reports_callbacks(app)
     register_deployment_callbacks(app)
     register_view_2d_callbacks(app)
+    register_view_4d_callbacks(app)
+    register_sensor_coverage_callbacks(app)
+    register_emergency_callbacks(app)
+    register_data_explorer_callbacks(app)
     register_booking_callbacks(app)
     register_admin_callbacks(app)
 
@@ -104,6 +117,10 @@ def _register_routing_callback(app: object) -> None:
             from views.pages.reports import create_reports_page
             from views.pages.simulation import create_simulation_page
             from views.pages.view_2d import create_view_2d_page
+            from views.pages.view_4d import create_view_4d_page
+            from views.pages.view_data import create_data_explorer_page
+            from views.pages.view_emergency import create_emergency_page
+            from views.pages.view_sensors import create_sensor_coverage_page
 
             page_map = {
                 "/": create_overview_page,
@@ -114,7 +131,10 @@ def _register_routing_callback(app: object) -> None:
                 "/insights": create_insights_page,
                 "/building_3d": create_building_3d_page,
                 "/view_2d": create_view_2d_page,
-                "/view_4d": create_simulation_page,
+                "/view_4d": create_view_4d_page,
+                "/view_sensors": create_sensor_coverage_page,
+                "/view_emergency": create_emergency_page,
+                "/view_data": create_data_explorer_page,
                 "/simulation": create_simulation_page,
                 "/reports": create_reports_page,
                 "/deployment": create_deployment_page,
@@ -555,10 +575,11 @@ def _register_sidebar_active(app: object) -> None:
                 '/deployment': 'deployment', '/admin': 'admin',
                 '/booking': 'booking',
                 '/view_2d': 'view_2d', '/building_3d': 'building_3d',
-                '/view_4d': 'view_4d'
+                '/view_4d': 'view_4d', '/view_sensors': 'view_sensors',
+                '/view_emergency': 'view_emergency', '/view_data': 'view_data'
             };
             var activeId = map[pathname] || 'overview';
-            var viewSubs = ['view_2d', 'building_3d', 'view_4d'];
+            var viewSubs = ['view_2d', 'building_3d', 'view_4d', 'view_sensors', 'view_emergency', 'view_data'];
             var isViewPage = viewSubs.indexOf(activeId) >= 0;
 
             document.querySelectorAll('.sidebar-nav-item').forEach(function(el) {
@@ -750,6 +771,126 @@ def _register_search_callback(app: object) -> None:
             )
 
         return items, {"display": "block"}
+
+
+def _register_notification_dropdown(app: object) -> None:
+    """Toggle notification dropdown and populate with recent alerts."""
+
+    @app.callback(
+        Output("notification-dropdown", "children"),
+        Output("notification-dropdown", "style"),
+        Input("notification-bell-btn", "n_clicks"),
+        State("building-state-store", "data"),
+        State("notification-dropdown", "style"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def toggle_notification_dropdown(
+        n_clicks: int | None,
+        state_data: dict | None,
+        current_style: dict | None,
+    ) -> tuple:
+        """Toggle dropdown visibility and populate alerts."""
+        if not n_clicks:
+            return no_update, no_update
+
+        current_style = current_style or {}
+        is_visible = current_style.get("display") != "none"
+
+        if is_visible:
+            return no_update, {"display": "none"}
+
+        # Build alert items from building state
+        from config.building import get_zone_by_id
+
+        alerts: list = []
+        if state_data:
+            for floor_state in state_data.get("floors", []):
+                for zone in floor_state.get("zones", []):
+                    status = zone.get("status", "unknown")
+                    if status in ("warning", "critical"):
+                        zone_info = get_zone_by_id(zone["zone_id"])
+                        name = zone_info.name if zone_info else zone["zone_id"]
+                        msg = _build_alert_message(zone, name)
+                        severity = "critical" if status == "critical" else "warning"
+                        alerts.append({"message": msg, "severity": severity})
+
+        if not alerts:
+            children = [
+                html.Div(
+                    [
+                        DashIconify(
+                            icon="mdi:check-circle-outline", width=24, color="#34C759"
+                        ),
+                        html.P(
+                            "No active alerts",
+                            style={
+                                "margin": "8px 0 0",
+                                "fontSize": "13px",
+                                "color": "#6E6E73",
+                            },
+                        ),
+                    ],
+                    style={"textAlign": "center", "padding": "24px 16px"},
+                )
+            ]
+        else:
+            children = [
+                html.Div(
+                    "Recent Alerts",
+                    style={
+                        "fontSize": "13px",
+                        "fontWeight": 600,
+                        "padding": "12px 16px 8px",
+                        "color": "#1D1D1F",
+                        "borderBottom": "1px solid #E5E5EA",
+                    },
+                )
+            ]
+            for alert in alerts[:20]:
+                sev = alert["severity"]
+                dot_color = "#FF3B30" if sev == "critical" else "#FF9500"
+                children.append(
+                    html.Div(
+                        [
+                            html.Span(
+                                style={
+                                    "width": "8px",
+                                    "height": "8px",
+                                    "borderRadius": "50%",
+                                    "background": dot_color,
+                                    "flexShrink": 0,
+                                },
+                            ),
+                            html.Span(
+                                alert["message"],
+                                style={"fontSize": "13px", "color": "#1D1D1F"},
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "flex-start",
+                            "gap": "8px",
+                            "padding": "10px 16px",
+                            "borderBottom": "1px solid #F2F2F7",
+                        },
+                    )
+                )
+
+        return children, {"display": "block"}
+
+
+def _register_lang_selector(app: object) -> None:
+    """Sync language dropdown to lang-store."""
+    app.clientside_callback(
+        """
+        function(val) {
+            return val || 'en';
+        }
+        """,
+        Output("lang-store", "data"),
+        Input("lang-selector", "value"),
+    )
 
 
 def _build_alert_message(zone_data: dict, name: str) -> str:

@@ -136,20 +136,47 @@ def create_header(
                 id="header-status",
                 className="status-badge healthy",
             ),
-            html.Span(
+            # Language selector
+            html.Div(
+                dcc.Dropdown(
+                    id="lang-selector",
+                    options=[
+                        {"label": "EN", "value": "en"},
+                        {"label": "PT", "value": "pt"},
+                    ],
+                    value="en",
+                    clearable=False,
+                    className="lang-dropdown",
+                ),
+                className="lang-badge",
+            ),
+            # Notification bell with dropdown
+            html.Div(
                 [
-                    DashIconify(
-                        icon="mdi:bell-outline",
-                        width=18,
-                        color=TEXT_SECONDARY,
+                    html.Div(
+                        [
+                            DashIconify(
+                                icon="mdi:bell-outline",
+                                width=18,
+                                color=TEXT_SECONDARY,
+                            ),
+                            html.Span(
+                                id="header-alert-count",
+                                children="0",
+                                className="header-alert-badge",
+                            ),
+                        ],
+                        id="notification-bell-btn",
+                        className="header-alert-count",
+                        n_clicks=0,
                     ),
-                    html.Span(
-                        id="header-alert-count",
-                        children="0",
-                        className="header-alert-badge",
+                    html.Div(
+                        id="notification-dropdown",
+                        className="notification-dropdown",
+                        style={"display": "none"},
                     ),
                 ],
-                className="header-alert-count",
+                style={"position": "relative"},
             ),
         ],
         className="header-right",

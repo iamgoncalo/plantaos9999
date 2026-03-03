@@ -408,27 +408,47 @@ def _register_pdf_download(app: object) -> None:
     ) -> dict | None:
         if pathname != "/reports" or not n_clicks:
             return no_update
+
+        import base64
+
+        period_label = {"today": "today", "7d": "7days", "30d": "30days"}.get(
+            period, "report"
+        )
+
+        # Try real PDF first
+        try:
+            from utils.pdf_report import generate_report_pdf
+
+            pdf_bytes = generate_report_pdf(period=period)
+            return dict(
+                content=base64.b64encode(pdf_bytes).decode(),
+                filename=f"plantaos_report_{period_label}.pdf",
+                type="application/pdf",
+                base64=True,
+            )
+        except Exception as e:
+            logger.warning(f"PDF generation error, falling back to HTML: {e}")
+
+        # Fallback to HTML
         try:
             from utils.pdf_report import generate_report_html
 
             html_content = generate_report_html(period=period)
-            period_label = {"today": "today", "7d": "7days", "30d": "30days"}.get(
-                period, "report"
-            )
             filename = f"plantaos_report_{period_label}.html"
             return dict(content=html_content, filename=filename, type="text/html")
         except Exception as e:
-            logger.warning(f"PDF download error: {e}")
-            # Fallback to CSV
-            try:
-                from utils.pdf_report import generate_report_csv
+            logger.warning(f"HTML report error: {e}")
 
-                csv_content = generate_report_csv(period=period)
-                return dict(
-                    content=csv_content,
-                    filename="plantaos_report.csv",
-                    type="text/csv",
-                )
-            except Exception as e2:
-                logger.warning(f"CSV fallback error: {e2}")
-                return no_update
+        # Last resort: CSV
+        try:
+            from utils.pdf_report import generate_report_csv
+
+            csv_content = generate_report_csv(period=period)
+            return dict(
+                content=csv_content,
+                filename="plantaos_report.csv",
+                type="text/csv",
+            )
+        except Exception as e2:
+            logger.warning(f"CSV fallback error: {e2}")
+            return no_update

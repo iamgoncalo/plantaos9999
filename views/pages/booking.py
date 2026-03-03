@@ -204,6 +204,22 @@ def create_booking_page() -> html.Div:
                 ],
                 style={"flex": "1", "minWidth": "140px"},
             ),
+            html.Div(
+                [
+                    _label("Requirements"),
+                    dcc.Checklist(
+                        id="booking-requirements",
+                        options=[
+                            {"label": " Projector", "value": "projector"},
+                            {"label": " Computers", "value": "computers"},
+                            {"label": " Quiet Zone", "value": "quiet"},
+                        ],
+                        value=[],
+                        style={"fontSize": "13px"},
+                    ),
+                ],
+                style={"flex": "1", "minWidth": "140px"},
+            ),
             html.Button(
                 [
                     DashIconify(icon="mdi:magnify", width=18, color="#FFFFFF"),

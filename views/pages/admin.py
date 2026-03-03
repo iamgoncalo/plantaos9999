@@ -60,6 +60,45 @@ def _input_group(label_text: str, input_component: dcc.Input) -> html.Div:
     )
 
 
+def _principle_row(title: str, description: str) -> html.Div:
+    """Create a row for the operating principles card.
+
+    Args:
+        title: Principle name displayed in bold.
+        description: Explanation text for the principle.
+
+    Returns:
+        html.Div with title/description flex row.
+    """
+    return html.Div(
+        [
+            html.Span(
+                title,
+                style={
+                    "fontWeight": 600,
+                    "fontSize": "14px",
+                    "color": TEXT_PRIMARY,
+                    "minWidth": "160px",
+                },
+            ),
+            html.Span(
+                description,
+                style={
+                    "fontSize": "13px",
+                    "color": TEXT_SECONDARY,
+                },
+            ),
+        ],
+        style={
+            "display": "flex",
+            "gap": "16px",
+            "padding": "10px 0",
+            "borderBottom": "1px solid #F2F2F7",
+            "alignItems": "flex-start",
+        },
+    )
+
+
 def _tenant_table() -> html.Table:
     """Build the tenant management HTML table.
 
@@ -489,6 +528,206 @@ def create_admin_page() -> html.Div:
                                 "fontSize": "13px",
                             },
                         ),
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
+                    "marginTop": f"{GAP_ELEMENT}px",
+                },
+            ),
+            # -- Privacy & Data Policy -----------------------------
+            html.Div(
+                [
+                    html.H3(
+                        "Privacy & Data Policy",
+                        style={
+                            "fontSize": "16px",
+                            "fontWeight": 600,
+                            "color": TEXT_PRIMARY,
+                            "marginBottom": "12px",
+                            "marginTop": 0,
+                        },
+                    ),
+                    html.P(
+                        "PlantaOS processes building sensor data locally. "
+                        "No personal identification data is collected or "
+                        "transmitted. Occupancy data is zone-level aggregate "
+                        "counts only.",
+                        style={
+                            "fontSize": "14px",
+                            "color": TEXT_SECONDARY,
+                            "lineHeight": "1.6",
+                            "marginBottom": "12px",
+                        },
+                    ),
+                    html.Ul(
+                        [
+                            html.Li(
+                                "Sensor data retained for 30 days, "
+                                "then automatically purged"
+                            ),
+                            html.Li(
+                                "Occupancy: aggregate zone-level counts "
+                                "only, no individual tracking"
+                            ),
+                            html.Li(
+                                "System guidance queries are anonymized "
+                                "\u2014 no PII transmitted"
+                            ),
+                            html.Li(
+                                "Data stored in-memory only, no persistent database"
+                            ),
+                            html.Li(
+                                "Camera systems: not deployed "
+                                "(policy: no visual surveillance)"
+                            ),
+                        ],
+                        style={
+                            "fontSize": "13px",
+                            "color": TEXT_SECONDARY,
+                            "lineHeight": "1.8",
+                            "paddingLeft": "20px",
+                        },
+                    ),
+                    html.Div(
+                        [
+                            html.Span(
+                                "Data Access Levels",
+                                style={
+                                    "fontWeight": 600,
+                                    "fontSize": "14px",
+                                    "color": TEXT_PRIMARY,
+                                },
+                            ),
+                            html.Table(
+                                [
+                                    html.Thead(
+                                        html.Tr(
+                                            [
+                                                html.Th("Role"),
+                                                html.Th("Access"),
+                                            ]
+                                        )
+                                    ),
+                                    html.Tbody(
+                                        [
+                                            html.Tr(
+                                                [
+                                                    html.Td("Admin"),
+                                                    html.Td(
+                                                        "Full system configuration"
+                                                    ),
+                                                ]
+                                            ),
+                                            html.Tr(
+                                                [
+                                                    html.Td("Operator"),
+                                                    html.Td(
+                                                        "View all data, manage bookings"
+                                                    ),
+                                                ]
+                                            ),
+                                            html.Tr(
+                                                [
+                                                    html.Td("Viewer"),
+                                                    html.Td("Dashboard view only"),
+                                                ]
+                                            ),
+                                        ]
+                                    ),
+                                ],
+                                style={
+                                    "width": "100%",
+                                    "borderCollapse": "collapse",
+                                    "marginTop": "8px",
+                                    "fontSize": "13px",
+                                },
+                            ),
+                        ],
+                        style={
+                            "marginTop": "16px",
+                            "borderTop": "1px solid #E5E5EA",
+                            "paddingTop": "12px",
+                        },
+                    ),
+                    html.P(
+                        "GDPR Compliance: All data processing complies "
+                        "with EU GDPR. Contact: dpo@plantaos.com",
+                        style={
+                            "fontSize": "12px",
+                            "color": TEXT_TERTIARY,
+                            "marginTop": "16px",
+                        },
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
+                    "marginTop": f"{GAP_ELEMENT}px",
+                },
+            ),
+            # -- Operating Principles ------------------------------
+            html.Div(
+                [
+                    html.H3(
+                        "Operating Principles",
+                        style={
+                            "fontSize": "16px",
+                            "fontWeight": 600,
+                            "color": TEXT_PRIMARY,
+                            "marginBottom": "12px",
+                            "marginTop": 0,
+                        },
+                    ),
+                    html.P(
+                        "System rules governing automated recommendations and alerts.",
+                        style={
+                            "fontSize": "14px",
+                            "color": TEXT_SECONDARY,
+                            "lineHeight": "1.6",
+                            "marginBottom": "12px",
+                        },
+                    ),
+                    html.Div(
+                        [
+                            _principle_row(
+                                "Comfort Thresholds",
+                                "Temperature 20-24\u00b0C, Humidity 40-60%, "
+                                "CO\u2082 <1000 ppm, Light 300-500 lux",
+                            ),
+                            _principle_row(
+                                "Alert Triggers",
+                                "Zone status moves to 'warning' when any "
+                                "metric exceeds \u00b11\u03c3 from baseline. "
+                                "'Critical' at \u00b12\u03c3.",
+                            ),
+                            _principle_row(
+                                "Scoring Formula",
+                                "Zone Performance = 0.35 \u00d7 Comfort + "
+                                "0.30 \u00d7 Energy Efficiency + "
+                                "0.20 \u00d7 Utilization + "
+                                "0.15 \u00d7 Safety",
+                            ),
+                            _principle_row(
+                                "Energy Baselines",
+                                "Rolling 7-day average per zone per "
+                                "15-min interval. Anomalies flagged "
+                                "above 2\u03c3.",
+                            ),
+                            _principle_row(
+                                "Booking Priority",
+                                "Room scoring: 45% comfort projection + "
+                                "35% energy efficiency + "
+                                "20% capacity fit",
+                            ),
+                        ]
                     ),
                 ],
                 className="card",

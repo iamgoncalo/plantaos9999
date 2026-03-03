@@ -106,6 +106,7 @@ def _register_room_finder(app: object) -> None:
         State("booking-duration", "value"),
         State("booking-people", "value"),
         State("booking-floor-pref", "value"),
+        State("booking-requirements", "value"),
         State("bookings-store", "data"),
         State("url", "pathname"),
         prevent_initial_call=True,
@@ -118,6 +119,7 @@ def _register_room_finder(app: object) -> None:
         duration: int | None,
         people: int | None,
         floor_pref: str | None,
+        requirements: list | None,
         bookings: list | None,
         pathname: str | None,
     ) -> list:
@@ -130,6 +132,7 @@ def _register_room_finder(app: object) -> None:
             duration: Duration in hours.
             people: Number of occupants.
             floor_pref: Floor preference ("any", "0", "1").
+            requirements: List of requirement values (projector, computers, quiet).
             bookings: Current bookings list from store.
             pathname: Current page URL.
 
@@ -144,6 +147,7 @@ def _register_room_finder(app: object) -> None:
         duration = duration or 1
         people = people or 15
         start_hour = start_hour or 9
+        requirements = requirements or []
         bookings = bookings or []
 
         # Parse date
@@ -171,6 +175,11 @@ def _register_room_finder(app: object) -> None:
 
             # Score the room
             score_data = _score_room(zone, people, duration)
+
+            # Apply requirement bonuses
+            req_bonus = _compute_requirement_bonus(zone, requirements)
+            score_data["total"] = round(score_data["total"] + req_bonus, 1)
+
             candidates.append((score_data["total"], zone, score_data))
 
         candidates.sort(key=lambda x: x[0], reverse=True)
@@ -306,6 +315,34 @@ def _score_room(
         "avg_temp": round(avg_temp, 1),
         "peak_co2": round(max(co2s) if co2s else 500, 0),
     }
+
+
+def _compute_requirement_bonus(zone: object, requirements: list[str]) -> float:
+    """Compute bonus points for matching room equipment requirements.
+
+    Args:
+        zone: Zone model object with an 'id' and 'capacity' attribute.
+        requirements: List of requirement strings ('projector', 'computers', 'quiet').
+
+    Returns:
+        Total bonus points to add to the room score.
+    """
+    if not requirements:
+        return 0.0
+
+    bonus = 0.0
+    zone_id_lower = zone.id.lower()
+
+    if "computers" in requirements and "informatica" in zone_id_lower:
+        bonus += 10.0
+    if "projector" in requirements and (
+        "multiusos" in zone_id_lower or "auditorio" in zone_id_lower
+    ):
+        bonus += 10.0
+    if "quiet" in requirements and zone.capacity < 20:
+        bonus += 5.0
+
+    return bonus
 
 
 def _build_room_card(

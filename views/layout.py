@@ -32,6 +32,10 @@ def create_layout() -> html.Div:
             dcc.Store(id="tenant-store", storage_type="local", data="horse_renault"),
             dcc.Store(id="admin-settings-store", storage_type="local"),
             dcc.Store(id="bookings-store", storage_type="memory", data=[]),
+            dcc.Store(id="lang-store", storage_type="local", data="en"),
+            dcc.Store(id="sensors-store", storage_type="local", data=[]),
+            dcc.Store(id="audit-log-store", storage_type="memory", data=[]),
+            dcc.Store(id="notification-open-store", storage_type="memory", data=False),
             dcc.Interval(
                 id="data-refresh-interval",
                 interval=_REFRESH_MS,

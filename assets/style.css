@@ -177,6 +177,40 @@ body {
     color: var(--text-tertiary);
 }
 
+/* ── Search Results Dropdown ─────────────────── */
+.search-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-default);
+}
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 200ms ease;
+}
+
+.search-result-item:hover {
+    background: var(--bg-hover);
+}
+
+.search-results-dropdown a {
+    text-decoration: none;
+    display: block;
+}
+
 /* ── Tenant Badge ────────────────────────────── */
 .tenant-badge {
     display: inline-flex;

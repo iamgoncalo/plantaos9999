@@ -168,7 +168,7 @@ def create_admin_page() -> html.Div:
     return html.Div(
         [
             # -- Session store + confirm dialogs --------------------
-            dcc.Store(id="admin-settings-store", storage_type="session"),
+            dcc.Store(id="admin-settings-store", storage_type="local"),
             dcc.ConfirmDialog(
                 id="admin-confirm-save",
                 message="Save these settings?",
@@ -320,35 +320,141 @@ def create_admin_page() -> html.Div:
                     "flexWrap": "wrap",
                 },
             ),
-            # -- Bottom card: Data Management ---------------------
+            # -- Danger Zone ------------------------------------
+            dcc.ConfirmDialog(
+                id="admin-confirm-clear-bookings",
+                message="Clear all bookings? This cannot be undone.",
+            ),
             html.Div(
                 [
                     html.H3(
-                        "Data Management",
+                        "Danger Zone",
                         style={
                             "fontSize": "16px",
                             "fontWeight": 600,
-                            "color": TEXT_PRIMARY,
+                            "color": "#FF3B30",
                             "marginBottom": "12px",
                             "marginTop": 0,
                         },
                     ),
                     html.P(
-                        "Current data: 30 days of synthetic readings",
+                        "These actions are destructive and cannot be reversed.",
                         style={
-                            "fontSize": "14px",
+                            "fontSize": "13px",
                             "color": TEXT_SECONDARY,
                             "marginBottom": "16px",
                         },
                     ),
-                    html.Button(
-                        "Regenerate Data",
-                        id="admin-regen-btn",
-                        className="btn-primary",
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "Regenerate synthetic data",
+                                        style={
+                                            "fontSize": "14px",
+                                            "fontWeight": 500,
+                                            "color": TEXT_PRIMARY,
+                                        },
+                                    ),
+                                    html.Span(
+                                        "Replaces all 30 days of data with "
+                                        "a new random seed.",
+                                        style={
+                                            "fontSize": "12px",
+                                            "color": TEXT_TERTIARY,
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "display": "flex",
+                                    "flexDirection": "column",
+                                    "gap": "2px",
+                                    "flex": "1",
+                                },
+                            ),
+                            html.Button(
+                                "Regenerate Data",
+                                id="admin-regen-btn",
+                                className="btn-danger",
+                                style={
+                                    "padding": "8px 20px",
+                                    "background": "#FFFFFF",
+                                    "color": "#FF3B30",
+                                    "border": "1px solid #FF3B30",
+                                    "borderRadius": "8px",
+                                    "fontSize": "13px",
+                                    "fontWeight": 600,
+                                    "cursor": "pointer",
+                                    "fontFamily": FONT_STACK,
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "16px",
+                            "padding": "12px 0",
+                            "borderBottom": "1px solid #FFE5E3",
+                        },
                     ),
                     html.Div(
                         id="admin-regen-status",
-                        style={"marginTop": "12px"},
+                        style={"marginTop": "8px", "marginBottom": "12px"},
+                    ),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "Clear all bookings",
+                                        style={
+                                            "fontSize": "14px",
+                                            "fontWeight": 500,
+                                            "color": TEXT_PRIMARY,
+                                        },
+                                    ),
+                                    html.Span(
+                                        "Removes all room bookings from memory.",
+                                        style={
+                                            "fontSize": "12px",
+                                            "color": TEXT_TERTIARY,
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "display": "flex",
+                                    "flexDirection": "column",
+                                    "gap": "2px",
+                                    "flex": "1",
+                                },
+                            ),
+                            html.Button(
+                                "Clear Bookings",
+                                id="admin-clear-bookings-btn",
+                                style={
+                                    "padding": "8px 20px",
+                                    "background": "#FFFFFF",
+                                    "color": "#FF3B30",
+                                    "border": "1px solid #FF3B30",
+                                    "borderRadius": "8px",
+                                    "fontSize": "13px",
+                                    "fontWeight": 600,
+                                    "cursor": "pointer",
+                                    "fontFamily": FONT_STACK,
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "16px",
+                            "padding": "12px 0",
+                        },
+                    ),
+                    html.Div(
+                        id="admin-clear-bookings-status",
+                        style={"marginTop": "8px"},
                     ),
                 ],
                 className="card",
@@ -358,6 +464,7 @@ def create_admin_page() -> html.Div:
                     "borderRadius": CARD_RADIUS,
                     "boxShadow": CARD_SHADOW,
                     "marginTop": f"{GAP_ELEMENT}px",
+                    "border": "1px solid #FFE5E3",
                 },
             ),
             # -- System Health ----------------------------------

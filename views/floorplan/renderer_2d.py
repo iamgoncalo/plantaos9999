@@ -119,6 +119,9 @@ def render_floorplan_2d(
         # Hover trace (invisible marker with rich tooltip)
         fig.add_trace(_create_hover_trace(zone_id, center, zd, zone_info))
 
+        # Polygon fill trace for accurate click hit detection
+        fig.add_trace(_create_click_fill_trace(zone_id, polygon))
+
         # Occupancy dots (team-colored)
         if occ and occ > 0:
             dot_color = _ZONE_TEAM_COLORS.get(zone_id, ACCENT_BLUE)
@@ -301,6 +304,40 @@ def _create_hover_trace(
         hoverinfo="text",
         showlegend=False,
         customdata=[zone_id],
+    )
+
+
+def _create_click_fill_trace(
+    zone_id: str,
+    polygon: list[tuple[float, float]],
+) -> go.Scatter:
+    """Create an invisible polygon fill trace for accurate click detection.
+
+    Uses fill="toself" with hoveron="fills" so that clicking anywhere
+    inside the polygon returns the correct zone_id via customdata.
+
+    Args:
+        zone_id: Zone identifier.
+        polygon: List of (x, y) polygon vertices.
+
+    Returns:
+        Plotly Scatter trace with transparent fill over the zone polygon.
+    """
+    # Close the polygon by repeating the first point
+    xs = [p[0] for p in polygon] + [polygon[0][0]]
+    ys = [p[1] for p in polygon] + [polygon[0][1]]
+
+    return go.Scatter(
+        x=xs,
+        y=ys,
+        fill="toself",
+        fillcolor="rgba(0,0,0,0)",
+        line=dict(width=0, color="rgba(0,0,0,0)"),
+        mode="lines",
+        hoveron="fills+points",
+        customdata=[zone_id] * len(xs),
+        hoverinfo="skip",
+        showlegend=False,
     )
 
 

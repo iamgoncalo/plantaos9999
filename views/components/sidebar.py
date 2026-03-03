@@ -145,6 +145,7 @@ def create_sidebar(active_page: str = "overview") -> html.Div:
             nav_items.append(
                 html.Div(
                     submenu_children,
+                    id="submenu-view",
                     className="sidebar-submenu",
                     style=submenu_style,
                 )

@@ -178,7 +178,11 @@ def _register_occ_timeline(app: object) -> None:
             fig = go.Figure()
 
             # Shift bands (only for "today" view)
-            if time_range == "today" and not building_occ.empty:
+            if (
+                time_range == "today"
+                and not building_occ.empty
+                and len(building_occ) > 0
+            ):
                 day = building_occ["timestamp"].dt.date.iloc[0]
                 for start_h, end_h, label, color in [
                     (6, 14, "Morning", "rgba(0, 113, 227, 0.04)"),

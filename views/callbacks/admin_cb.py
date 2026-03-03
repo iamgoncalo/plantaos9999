@@ -22,6 +22,7 @@ def register_admin_callbacks(app: object) -> None:
     """
     _register_save_settings(app)
     _register_regen_data(app)
+    _register_clear_bookings(app)
     _register_system_health(app)
 
 
@@ -113,7 +114,7 @@ def _register_regen_data(app: object) -> None:
     )
     @safe_callback
     def regen_data(n_clicks: int | None) -> html.Span:
-        """Queue data regeneration and return user feedback.
+        """Regenerate synthetic data and return user feedback.
 
         Args:
             n_clicks: Confirm dialog submit click count.
@@ -124,10 +125,67 @@ def _register_regen_data(app: object) -> None:
         if n_clicks is None:
             raise PreventUpdate
 
-        logger.info("Data regeneration requested from admin page")
-        return html.Span(
-            "Data regeneration queued. Refresh the page in 10 seconds.",
-            style={"fontSize": "13px", "color": "#0071E3"},
+        try:
+            from data.pipeline import run_pipeline
+
+            logger.info("Data regeneration triggered from admin page")
+            run_pipeline(days=30, seed=None)
+            logger.info("Data regeneration complete")
+            return html.Span(
+                "Data regeneration complete. Dashboard is updating.",
+                style={"fontSize": "13px", "color": "#34C759"},
+            )
+        except Exception as exc:
+            logger.warning(f"Data regeneration error: {exc}")
+            return html.Span(
+                f"Regeneration failed: {exc}",
+                style={"fontSize": "13px", "color": "#FF3B30"},
+            )
+
+
+def _register_clear_bookings(app: object) -> None:
+    """Clear all bookings from the bookings store with confirmation."""
+
+    @app.callback(
+        Output("admin-confirm-clear-bookings", "displayed"),
+        Input("admin-clear-bookings-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def show_clear_confirm(n_clicks: int | None) -> bool:
+        """Open confirmation dialog before clearing bookings."""
+        return bool(n_clicks)
+
+    @app.callback(
+        Output("bookings-store", "data", allow_duplicate=True),
+        Output("admin-clear-bookings-status", "children"),
+        Input("admin-confirm-clear-bookings", "submit_n_clicks"),
+        State("url", "pathname"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def clear_bookings(
+        n_clicks: int | None,
+        pathname: str | None,
+    ) -> tuple:
+        """Clear all bookings from store.
+
+        Args:
+            n_clicks: Confirm dialog submit click count.
+            pathname: Current page URL path.
+
+        Returns:
+            Tuple of (empty bookings list, status message).
+        """
+        if n_clicks is None:
+            raise PreventUpdate
+        if pathname != "/admin":
+            return no_update, no_update
+
+        logger.info("All bookings cleared from admin page")
+        return [], html.Span(
+            "All bookings cleared.",
+            style={"fontSize": "13px", "color": "#34C759"},
         )
 
 

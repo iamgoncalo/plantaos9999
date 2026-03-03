@@ -452,13 +452,23 @@ def create_booking_page() -> html.Div:
         },
     )
 
-    # ── Confirm dialog + zone store ───────────
-    confirm_dialog = dcc.ConfirmDialog(
-        id="booking-confirm-dialog",
-        message="Confirm this booking?",
+    # ── Confirm dialogs + zone stores ───────────
+    create_confirm = dcc.ConfirmDialog(
+        id="booking-create-confirm",
+        message=(
+            "Create this booking? The room will be reserved for the specified time."
+        ),
+    )
+    cancel_confirm = dcc.ConfirmDialog(
+        id="booking-cancel-confirm",
+        message=("Cancel this booking? The room will be released."),
     )
     confirm_store = dcc.Store(
         id="booking-confirm-zone-store",
+        storage_type="memory",
+    )
+    cancel_store = dcc.Store(
+        id="booking-cancel-index-store",
         storage_type="memory",
     )
     booking_status = html.Div(id="booking-status-msg")
@@ -470,8 +480,10 @@ def create_booking_page() -> html.Div:
             shared_controls,
             find_section,
             analyze_section,
-            confirm_dialog,
+            create_confirm,
+            cancel_confirm,
             confirm_store,
+            cancel_store,
             booking_status,
         ],
         className="page-enter",

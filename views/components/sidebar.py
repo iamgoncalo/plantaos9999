@@ -32,30 +32,18 @@ NAV_ITEMS: list[dict] = [
         "icon": "mdi:eye-outline",
         "submenu": [
             {"id": "view_2d", "label": "2D Map", "icon": "mdi:map-outline"},
-            {
-                "id": "building_3d",
-                "label": "3D Walkthrough",
-                "icon": "mdi:cube-outline",
-            },
-            {"id": "view_4d", "label": "4D Explorer", "icon": "mdi:clock-fast"},
-            {
-                "id": "view_sensors",
-                "label": "Sensor Coverage",
-                "icon": "mdi:access-point",
-            },
-            {
-                "id": "view_emergency",
-                "label": "Emergency Mode",
-                "icon": "mdi:fire-alert",
-            },
-            {"id": "view_data", "label": "Data Explorer", "icon": "mdi:table-search"},
+            {"id": "building_3d", "label": "3D Orbit", "icon": "mdi:cube-outline"},
+            {"id": "building_3d_walk", "label": "3D Walk", "icon": "mdi:walk"},
+            {"id": "view_4d", "label": "Timeline (4D)", "icon": "mdi:clock-fast"},
+            {"id": "view_flow", "label": "Flow", "icon": "mdi:swap-horizontal"},
+            {"id": "view_heatmap", "label": "Heatmap", "icon": "mdi:grid"},
         ],
     },
     {"id": "booking", "label": "Booking", "icon": "mdi:calendar-clock"},
     {"id": "simulation", "label": "Simulation", "icon": "mdi:play-circle-outline"},
-    {"id": "insights", "label": "Guidance", "icon": "mdi:lightbulb-on"},
+    {"id": "insights", "label": "Insights", "icon": "mdi:lightbulb-on"},
     {"id": "reports", "label": "Reports", "icon": "mdi:file-chart-outline"},
-    {"id": "deployment", "label": "Deployment", "icon": "mdi:rocket-launch-outline"},
+    {"id": "sensors", "label": "Sensors", "icon": "mdi:access-point"},
     {"id": "admin", "label": "Settings", "icon": "mdi:cog-outline"},
 ]
 

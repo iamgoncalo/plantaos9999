@@ -17,6 +17,7 @@ from config.theme import (
     FONT_STACK,
     GAP_ELEMENT,
     PADDING_CARD,
+    STATUS_HEALTHY,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
     TEXT_TERTIARY,
@@ -95,6 +96,42 @@ def _principle_row(title: str, description: str) -> html.Div:
             "padding": "10px 0",
             "borderBottom": "1px solid #F2F2F7",
             "alignItems": "flex-start",
+        },
+    )
+
+
+def _build_api_status_badge() -> html.Span:
+    """Build a read-only API connection status badge.
+
+    Checks whether the Anthropic API key is configured (not the actual value).
+
+    Returns:
+        html.Span with green 'Connected' or gray 'Not configured' badge.
+    """
+    from config.settings import settings
+
+    api_configured = bool(settings.ANTHROPIC_API_KEY)
+    if api_configured:
+        return html.Span(
+            "Connected",
+            style={
+                "fontSize": "12px",
+                "fontWeight": 500,
+                "color": STATUS_HEALTHY,
+                "padding": "4px 12px",
+                "borderRadius": "8px",
+                "background": "#E8F9EE",
+            },
+        )
+    return html.Span(
+        "Not configured",
+        style={
+            "fontSize": "12px",
+            "fontWeight": 500,
+            "color": TEXT_TERTIARY,
+            "padding": "4px 12px",
+            "borderRadius": "8px",
+            "background": "#F2F2F7",
         },
     )
 
@@ -554,9 +591,9 @@ def create_admin_page() -> html.Div:
                     ),
                     html.P(
                         "PlantaOS processes building sensor data locally. "
-                        "No personal identification data is collected or "
-                        "transmitted. Occupancy data is zone-level aggregate "
-                        "counts only.",
+                        "Occupancy data uses anonymous counts only. "
+                        "No personal identification data is collected "
+                        "or transmitted.",
                         style={
                             "fontSize": "14px",
                             "color": TEXT_SECONDARY,
@@ -567,12 +604,13 @@ def create_admin_page() -> html.Div:
                     html.Ul(
                         [
                             html.Li(
-                                "Sensor data retained for 30 days, "
-                                "then automatically purged"
+                                "Data minimization: Occupancy data uses "
+                                "anonymous counts only. No personal "
+                                "identification."
                             ),
                             html.Li(
-                                "Occupancy: aggregate zone-level counts "
-                                "only, no individual tracking"
+                                "Data retention: 30 days (synthetic). "
+                                "Configurable per deployment."
                             ),
                             html.Li(
                                 "System guidance queries are anonymized "
@@ -580,10 +618,6 @@ def create_admin_page() -> html.Div:
                             ),
                             html.Li(
                                 "Data stored in-memory only, no persistent database"
-                            ),
-                            html.Li(
-                                "Camera systems: not deployed "
-                                "(policy: no visual surveillance)"
                             ),
                         ],
                         style={
@@ -593,6 +627,64 @@ def create_admin_page() -> html.Div:
                             "paddingLeft": "20px",
                         },
                     ),
+                    # Camera policy toggle
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    DashIconify(
+                                        icon="mdi:camera-off-outline",
+                                        width=18,
+                                        color=TEXT_TERTIARY,
+                                    ),
+                                    html.Span(
+                                        "Camera Integration",
+                                        style={
+                                            "fontWeight": 500,
+                                            "fontSize": "14px",
+                                            "color": TEXT_PRIMARY,
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "display": "flex",
+                                    "alignItems": "center",
+                                    "gap": "8px",
+                                },
+                            ),
+                            html.Div(
+                                [
+                                    dcc.Checklist(
+                                        id="admin-camera-toggle",
+                                        options=[
+                                            {
+                                                "label": " Enabled",
+                                                "value": "enabled",
+                                            },
+                                        ],
+                                        value=[],
+                                        style={"fontSize": "13px"},
+                                    ),
+                                    html.Span(
+                                        "Disabled. If enabled, only derived "
+                                        "metadata is stored. No images or "
+                                        "video are retained.",
+                                        style={
+                                            "fontSize": "12px",
+                                            "color": TEXT_TERTIARY,
+                                            "marginTop": "4px",
+                                        },
+                                    ),
+                                ],
+                            ),
+                        ],
+                        style={
+                            "padding": "12px 0",
+                            "borderTop": "1px solid #E5E5EA",
+                            "marginTop": "8px",
+                        },
+                    ),
+                    # Data Access Levels
                     html.Div(
                         [
                             html.Span(
@@ -655,8 +747,9 @@ def create_admin_page() -> html.Div:
                         },
                     ),
                     html.P(
-                        "GDPR Compliance: All data processing complies "
-                        "with EU GDPR. Contact: dpo@plantaos.com",
+                        "GDPR Compliance: System designed for GDPR "
+                        "compliance. Contact admin for data requests. "
+                        "dpo@plantaos.com",
                         style={
                             "fontSize": "12px",
                             "color": TEXT_TERTIARY,
@@ -699,24 +792,23 @@ def create_admin_page() -> html.Div:
                         [
                             _principle_row(
                                 "Comfort Thresholds",
-                                "Temperature 20-24\u00b0C, Humidity 40-60%, "
-                                "CO\u2082 <1000 ppm, Light 300-500 lux",
+                                "Temperature 20\u201324\u00b0C, "
+                                "CO\u2082 < 800 ppm, "
+                                "Humidity 40\u201360%",
                             ),
                             _principle_row(
                                 "Alert Triggers",
-                                "Zone status moves to 'warning' when any "
-                                "metric exceeds \u00b11\u03c3 from baseline. "
-                                "'Critical' at \u00b12\u03c3.",
+                                "Temperature deviation > 2\u00b0C, "
+                                "CO\u2082 > 1000 ppm, "
+                                "Occupancy > 90% capacity",
                             ),
                             _principle_row(
                                 "Scoring Formula",
-                                "Zone Performance = 0.35 \u00d7 Comfort + "
-                                "0.30 \u00d7 Energy Efficiency + "
-                                "0.20 \u00d7 Utilization + "
-                                "0.15 \u00d7 Safety",
+                                "Zone health = f(temperature, CO\u2082, "
+                                "humidity, occupancy, energy)",
                             ),
                             _principle_row(
-                                "Energy Baselines",
+                                "Adaptive Baselines",
                                 "Rolling 7-day average per zone per "
                                 "15-min interval. Anomalies flagged "
                                 "above 2\u03c3.",
@@ -728,6 +820,228 @@ def create_admin_page() -> html.Div:
                                 "20% capacity fit",
                             ),
                         ]
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
+                    "marginTop": f"{GAP_ELEMENT}px",
+                },
+            ),
+            # -- Key Management --------------------------------
+            html.Div(
+                [
+                    html.H3(
+                        "Key Management",
+                        style={
+                            "fontSize": "16px",
+                            "fontWeight": 600,
+                            "color": TEXT_PRIMARY,
+                            "marginBottom": "12px",
+                            "marginTop": 0,
+                        },
+                    ),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "Anthropic API",
+                                        style={
+                                            "fontWeight": 500,
+                                            "fontSize": "14px",
+                                            "color": TEXT_PRIMARY,
+                                        },
+                                    ),
+                                    html.Span(
+                                        "Used for operational intelligence "
+                                        "and building insights.",
+                                        style={
+                                            "fontSize": "12px",
+                                            "color": TEXT_TERTIARY,
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "display": "flex",
+                                    "flexDirection": "column",
+                                    "gap": "2px",
+                                    "flex": "1",
+                                },
+                            ),
+                            html.Div(
+                                id="admin-api-status-badge",
+                                children=_build_api_status_badge(),
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "16px",
+                            "padding": "10px 0",
+                        },
+                    ),
+                    html.P(
+                        "API keys are never displayed. Only connection "
+                        "status is shown. Configure keys via environment "
+                        "variables or the Pricing & Integration card above.",
+                        style={
+                            "fontSize": "12px",
+                            "color": TEXT_TERTIARY,
+                            "marginTop": "8px",
+                        },
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
+                    "marginTop": f"{GAP_ELEMENT}px",
+                },
+            ),
+            # -- Audit Log Viewer --------------------------------
+            dcc.ConfirmDialog(
+                id="admin-confirm-clear-audit",
+                message=("Clear the audit log? This cannot be undone."),
+            ),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.H3(
+                                "Audit Log",
+                                style={
+                                    "fontSize": "16px",
+                                    "fontWeight": 600,
+                                    "color": TEXT_PRIMARY,
+                                    "marginBottom": 0,
+                                    "marginTop": 0,
+                                },
+                            ),
+                            html.Button(
+                                "Clear Log",
+                                id="admin-clear-audit-btn",
+                                style={
+                                    "padding": "6px 14px",
+                                    "background": "#FFFFFF",
+                                    "color": TEXT_TERTIARY,
+                                    "border": f"1px solid {TEXT_TERTIARY}",
+                                    "borderRadius": "8px",
+                                    "fontSize": "12px",
+                                    "fontWeight": 500,
+                                    "cursor": "pointer",
+                                    "fontFamily": FONT_STACK,
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "alignItems": "center",
+                            "marginBottom": "12px",
+                        },
+                    ),
+                    html.Div(
+                        id="admin-audit-log-viewer",
+                        children=html.Span(
+                            "No audit entries yet. Actions like sensor "
+                            "changes, tenant switches, and exports are "
+                            "logged here.",
+                            style={
+                                "color": TEXT_TERTIARY,
+                                "fontSize": "13px",
+                            },
+                        ),
+                    ),
+                ],
+                className="card",
+                style={
+                    "padding": f"{PADDING_CARD}px",
+                    "background": BG_CARD,
+                    "borderRadius": CARD_RADIUS,
+                    "boxShadow": CARD_SHADOW,
+                    "marginTop": f"{GAP_ELEMENT}px",
+                },
+            ),
+            # -- Role Concept (MVP simple) -------------------------
+            html.Div(
+                [
+                    html.H3(
+                        "Access Control",
+                        style={
+                            "fontSize": "16px",
+                            "fontWeight": 600,
+                            "color": TEXT_PRIMARY,
+                            "marginBottom": "12px",
+                            "marginTop": 0,
+                        },
+                    ),
+                    html.Div(
+                        [
+                            DashIconify(
+                                icon="mdi:shield-account-outline",
+                                width=20,
+                                color=ACCENT_BLUE,
+                            ),
+                            html.Span(
+                                "Current role: Admin",
+                                style={
+                                    "fontSize": "14px",
+                                    "fontWeight": 500,
+                                    "color": TEXT_PRIMARY,
+                                },
+                            ),
+                            html.Span(
+                                "Admin",
+                                style={
+                                    "fontSize": "12px",
+                                    "fontWeight": 500,
+                                    "color": ACCENT_BLUE,
+                                    "padding": "2px 10px",
+                                    "borderRadius": "8px",
+                                    "background": "#E8F5EE",
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "8px",
+                            "marginBottom": "16px",
+                        },
+                    ),
+                    html.Div(
+                        [
+                            dcc.Checklist(
+                                id="admin-require-password",
+                                options=[
+                                    {
+                                        "label": (
+                                            " Require password for destructive actions"
+                                        ),
+                                        "value": "require_password",
+                                    },
+                                ],
+                                value=[],
+                                style={"fontSize": "13px"},
+                            ),
+                            html.Span(
+                                "When enabled, data regeneration and "
+                                "booking clears will require confirmation "
+                                "with a password.",
+                                style={
+                                    "fontSize": "12px",
+                                    "color": TEXT_TERTIARY,
+                                    "marginTop": "4px",
+                                    "display": "block",
+                                },
+                            ),
+                        ],
                     ),
                 ],
                 className="card",

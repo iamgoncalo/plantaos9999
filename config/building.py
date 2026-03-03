@@ -45,6 +45,10 @@ class Zone(BaseModel):
     has_sensors: bool = Field(
         default=True, description="Whether zone has comfort sensors"
     )
+    canonical: bool = Field(
+        default=True,
+        description="Whether this zone is in the canonical building spec",
+    )
 
 
 class Floor(BaseModel):
@@ -128,6 +132,7 @@ FLOOR_0_ZONES = [
         area_m2=72.70,
         capacity=57,
         zone_type=ZoneType.AUDITORIUM,
+        canonical=False,
     ),
     Zone(
         id="p0_sala",
@@ -136,6 +141,7 @@ FLOOR_0_ZONES = [
         area_m2=51.00,
         capacity=30,
         zone_type=ZoneType.TRAINING,
+        canonical=False,
     ),
     Zone(
         id="p0_informatica",
@@ -169,6 +175,7 @@ FLOOR_0_ZONES = [
         area_m2=10.15,
         capacity=5,
         zone_type=ZoneType.RECEPTION,
+        canonical=False,
     ),
     Zone(
         id="p0_wc",
@@ -189,6 +196,31 @@ FLOOR_0_ZONES = [
         zone_type=ZoneType.STORAGE,
         has_hvac=False,
         has_sensors=False,
+        canonical=False,
+    ),
+    Zone(
+        id="p0_formacao1",
+        name="Sala Formacao 1",
+        floor=0,
+        area_m2=40.00,
+        capacity=25,
+        zone_type=ZoneType.TRAINING,
+    ),
+    Zone(
+        id="p0_formacao2",
+        name="Sala Formacao 2",
+        floor=0,
+        area_m2=40.00,
+        capacity=25,
+        zone_type=ZoneType.TRAINING,
+    ),
+    Zone(
+        id="p0_formacao3",
+        name="Sala Formacao 3",
+        floor=0,
+        area_m2=40.00,
+        capacity=25,
+        zone_type=ZoneType.TRAINING,
     ),
 ]
 
@@ -220,6 +252,15 @@ FLOOR_1_ZONES = [
         area_m2=63.15,
         capacity=35,
         zone_type=ZoneType.TRAINING,
+        canonical=False,
+    ),
+    Zone(
+        id="p1_salagrande",
+        name="Sala Grande",
+        floor=1,
+        area_m2=42.10,
+        capacity=25,
+        zone_type=ZoneType.TRAINING,
     ),
     Zone(
         id="p1_reunioes",
@@ -227,6 +268,15 @@ FLOOR_1_ZONES = [
         floor=1,
         area_m2=35.15,
         capacity=20,
+        zone_type=ZoneType.MEETING,
+        canonical=False,
+    ),
+    Zone(
+        id="p1_salapequena",
+        name="Sala Pequena",
+        floor=1,
+        area_m2=25.00,
+        capacity=15,
         zone_type=ZoneType.MEETING,
     ),
     Zone(
@@ -236,6 +286,7 @@ FLOOR_1_ZONES = [
         area_m2=51.00,
         capacity=30,
         zone_type=ZoneType.TRAINING,
+        canonical=False,
     ),
     Zone(
         id="p1_sala_c",
@@ -244,6 +295,7 @@ FLOOR_1_ZONES = [
         area_m2=51.00,
         capacity=30,
         zone_type=ZoneType.TRAINING,
+        canonical=False,
     ),
     Zone(
         id="p1_sala_d",
@@ -252,6 +304,7 @@ FLOOR_1_ZONES = [
         area_m2=51.00,
         capacity=30,
         zone_type=ZoneType.TRAINING,
+        canonical=False,
     ),
     Zone(
         id="p1_circulacao",
@@ -271,6 +324,7 @@ FLOOR_1_ZONES = [
         zone_type=ZoneType.SANITARY,
         has_hvac=False,
         has_sensors=False,
+        canonical=False,
     ),
     Zone(
         id="p1_arrumos",
@@ -281,6 +335,15 @@ FLOOR_1_ZONES = [
         zone_type=ZoneType.STORAGE,
         has_hvac=False,
         has_sensors=False,
+        canonical=False,
+    ),
+    Zone(
+        id="p1_armazem",
+        name="Producao / Exibicao Armazem",
+        floor=1,
+        area_m2=25.80,
+        capacity=0,
+        zone_type=ZoneType.PRODUCTION,
     ),
 ]
 
@@ -341,10 +404,17 @@ def get_zones_by_type(zone_type: ZoneType) -> list[Zone]:
     return [z for z in CFT_BUILDING.all_zones if z.zone_type == zone_type]
 
 
-def get_monitored_zones() -> list[Zone]:
+def get_monitored_zones(canonical_only: bool = True) -> list[Zone]:
     """Get all zones that have sensors installed.
 
+    Args:
+        canonical_only: If True (default), only return zones marked
+            as canonical in the building spec.
+
     Returns:
-        List of Zone models with has_sensors=True.
+        List of Zone models with has_sensors=True (and canonical=True
+        when canonical_only is set).
     """
+    if canonical_only:
+        return [z for z in CFT_BUILDING.all_zones if z.has_sensors and z.canonical]
     return [z for z in CFT_BUILDING.all_zones if z.has_sensors]

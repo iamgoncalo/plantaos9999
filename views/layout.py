@@ -36,6 +36,14 @@ def create_layout() -> html.Div:
             dcc.Store(id="sensors-store", storage_type="local", data=[]),
             dcc.Store(id="audit-log-store", storage_type="memory", data=[]),
             dcc.Store(id="notification-open-store", storage_type="memory", data=False),
+            dcc.Store(id="tenant-pending-store", storage_type="memory"),
+            dcc.ConfirmDialog(
+                id="tenant-confirm-dialog",
+                message=(
+                    "Switching tenant will change all building data, reports,"
+                    " and sensor configurations. Are you sure?"
+                ),
+            ),
             dcc.Interval(
                 id="data-refresh-interval",
                 interval=_REFRESH_MS,

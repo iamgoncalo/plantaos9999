@@ -112,10 +112,11 @@ def _register_sidebar_active(app: object) -> None:
                 '/building_3d_walk': 'building_3d_walk',
                 '/view_4d': 'view_4d', '/view_sensors': 'view_sensors',
                 '/view_emergency': 'view_emergency', '/view_data': 'view_data',
-                '/view_flow': 'view_flow', '/view_heatmap': 'view_heatmap'
+                '/view_flow': 'view_flow', '/view_heatmap': 'view_heatmap',
+                '/view_map': 'view_map'
             };
             var activeId = map[pathname] || 'overview';
-            var viewSubs = ['view_2d', 'building_3d', 'building_3d_walk', 'view_4d', 'view_sensors', 'view_emergency', 'view_data', 'view_flow', 'view_heatmap'];
+            var viewSubs = ['view_2d', 'building_3d', 'building_3d_walk', 'view_4d', 'view_sensors', 'view_emergency', 'view_data', 'view_flow', 'view_heatmap', 'view_map'];
             var isViewPage = viewSubs.indexOf(activeId) >= 0;
 
             document.querySelectorAll('.sidebar-nav-item').forEach(function(el) {
@@ -262,7 +263,7 @@ def _register_search_callback(app: object) -> None:
             {
                 "label": zone.name,
                 "category": "Zone",
-                "href": "/",
+                "href": f"/view_2d?zone={zone.id}",
                 "floor": zone.floor,
             }
         )
@@ -418,6 +419,7 @@ def _register_notification_dropdown(
                             {
                                 "message": msg,
                                 "severity": severity,
+                                "zone_id": zone["zone_id"],
                             }
                         )
 
@@ -491,7 +493,7 @@ def _register_notification_dropdown(
                                 "cursor": "pointer",
                             },
                         ),
-                        href="/",
+                        href=f"/view_2d?zone={alert.get('zone_id', '')}",
                         style={
                             "textDecoration": "none",
                         },

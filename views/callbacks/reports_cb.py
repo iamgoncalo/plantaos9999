@@ -224,22 +224,33 @@ def _register_trend_line(app: object) -> None:
             for col in energy_df.select_dtypes(include=["number"]).columns:
                 energy_df[col] = energy_df[col].ffill().bfill().fillna(0)
 
-            # Group by day and compute daily cost
-            energy_df["date"] = energy_df["timestamp"].dt.date
-            daily = energy_df.groupby("date")["total_kwh"].sum().reset_index()
-            daily["cost_eur"] = daily["total_kwh"] * cfg.cost_per_kwh
+            # Group by hour (today) or day (7d/30d)
+            if period == "today":
+                energy_df["x_col"] = energy_df["timestamp"].dt.floor("h")
+                grouped = energy_df.groupby("x_col")["total_kwh"].sum().reset_index()
+                grouped["cost_eur"] = grouped["total_kwh"] * cfg.cost_per_kwh
+                chart_title = "Hourly Cost Trend (\u20ac)"
+                trace_name = "Hourly Cost"
+            else:
+                energy_df["x_col"] = energy_df["timestamp"].dt.date
+                grouped = energy_df.groupby("x_col")["total_kwh"].sum().reset_index()
+                grouped["cost_eur"] = grouped["total_kwh"] * cfg.cost_per_kwh
+                chart_title = "Daily Cost Trend (\u20ac)"
+                trace_name = "Daily Cost"
 
-            if daily.empty:
-                return empty_chart("No daily cost data available")
+            if grouped.empty:
+                return empty_chart(
+                    "No energy data for the selected period. Try a longer time range."
+                )
 
             fig = go.Figure()
 
             fig.add_trace(
                 go.Scatter(
-                    x=daily["date"],
-                    y=daily["cost_eur"],
+                    x=grouped["x_col"],
+                    y=grouped["cost_eur"],
                     mode="lines+markers",
-                    name="Daily Cost",
+                    name=trace_name,
                     line=dict(color=ACCENT_BLUE, width=2),
                     marker=dict(size=6),
                     hovertemplate="\u20ac%{y:.2f}<br>%{x}<extra></extra>",
@@ -247,7 +258,7 @@ def _register_trend_line(app: object) -> None:
             )
 
             # Add average reference line
-            avg_cost = daily["cost_eur"].mean()
+            avg_cost = grouped["cost_eur"].mean()
             if avg_cost > 0:
                 fig.add_hline(
                     y=avg_cost,
@@ -258,7 +269,7 @@ def _register_trend_line(app: object) -> None:
                 )
 
             fig.update_yaxes(title_text="Cost (\u20ac)")
-            return apply_chart_theme(fig, "Daily Cost Trend (\u20ac)")
+            return apply_chart_theme(fig, chart_title)
 
         except Exception as e:
             logger.warning(f"Reports trend line error: {e}")
@@ -354,24 +365,31 @@ def _register_savings_chart(app: object) -> None:
             energy_df = energy_df.copy()
             for col in energy_df.select_dtypes(include=["number"]).columns:
                 energy_df[col] = energy_df[col].ffill().bfill().fillna(0)
-            energy_df["date"] = energy_df["timestamp"].dt.date
 
-            daily = energy_df.groupby("date")["total_kwh"].sum().reset_index()
-            daily["actual_cost"] = daily["total_kwh"] * cfg.cost_per_kwh
+            # Group by hour (today) or day (7d/30d)
+            if period == "today":
+                energy_df["x_col"] = energy_df["timestamp"].dt.floor("h")
+            else:
+                energy_df["x_col"] = energy_df["timestamp"].dt.date
+
+            grouped = energy_df.groupby("x_col")["total_kwh"].sum().reset_index()
+            grouped["actual_cost"] = grouped["total_kwh"] * cfg.cost_per_kwh
 
             # Compute baseline as rolling mean + 10% overhead
-            overall_mean = daily["actual_cost"].mean()
-            daily["baseline_cost"] = overall_mean * 1.10
+            overall_mean = grouped["actual_cost"].mean()
+            grouped["baseline_cost"] = overall_mean * 1.10
 
-            if daily.empty:
-                return empty_chart("No savings data available")
+            if grouped.empty:
+                return empty_chart(
+                    "No energy data for the selected period. Try a longer time range."
+                )
 
             fig = go.Figure()
 
             fig.add_trace(
                 go.Bar(
-                    x=daily["date"],
-                    y=daily["baseline_cost"],
+                    x=grouped["x_col"],
+                    y=grouped["baseline_cost"],
                     name="Baseline",
                     marker=dict(color=STATUS_WARNING, opacity=0.5),
                     hovertemplate="Baseline: \u20ac%{y:.2f}<extra></extra>",
@@ -380,8 +398,8 @@ def _register_savings_chart(app: object) -> None:
 
             fig.add_trace(
                 go.Bar(
-                    x=daily["date"],
-                    y=daily["actual_cost"],
+                    x=grouped["x_col"],
+                    y=grouped["actual_cost"],
                     name="Actual",
                     marker=dict(color=ACCENT_BLUE),
                     hovertemplate="Actual: \u20ac%{y:.2f}<extra></extra>",

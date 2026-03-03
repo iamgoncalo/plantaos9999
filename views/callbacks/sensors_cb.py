@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dash import Input, Output, State, html, no_update
+from dash import ALL, Input, Output, State, ctx, html, no_update
 from dash_iconify import DashIconify
 
 from config.theme import (
@@ -368,6 +368,7 @@ def register_sensors_callbacks(app: object) -> None:
     _register_kpi_strip(app)
     _register_health_panel(app)
     _register_health_notifications(app)
+    _register_device_select(app)
     _register_add_device(app)
     _register_commission_device(app)
     _register_remove_device(app)
@@ -549,7 +550,14 @@ def _register_inventory(app: object) -> None:
                             },
                         ),
                     ],
-                    style={"borderBottom": "1px solid #F2F2F7"},
+                    id={
+                        "type": "sensor-row",
+                        "index": device.get("device_id", ""),
+                    },
+                    style={
+                        "borderBottom": "1px solid #F2F2F7",
+                        "cursor": "pointer",
+                    },
                 )
             )
 
@@ -870,6 +878,32 @@ def _register_health_notifications(app: object) -> None:
             )
 
         return html.Div(notifications)
+
+
+def _register_device_select(app: object) -> None:
+    """Track which device row the user clicked."""
+
+    @app.callback(
+        Output("sensors-selected-device", "data"),
+        Input({"type": "sensor-row", "index": ALL}, "n_clicks"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def select_device(n_clicks_list: list) -> str:
+        """Store the device_id of the clicked row.
+
+        Args:
+            n_clicks_list: Click counts for all sensor rows.
+
+        Returns:
+            Device ID string of the clicked row.
+        """
+        if not any(n_clicks_list):
+            return no_update
+        triggered_id = ctx.triggered_id
+        if not triggered_id:
+            return no_update
+        return triggered_id.get("index", "")
 
 
 def _register_add_device(app: object) -> None:

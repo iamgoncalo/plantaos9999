@@ -88,18 +88,9 @@ def _register_trigger(app: object) -> None:
     """
 
     @app.callback(
-        Output("sim-confirm-dialog", "displayed"),
-        Input("sim-trigger-btn", "n_clicks"),
-        prevent_initial_call=True,
-    )
-    @safe_callback
-    def show_sim_confirm(n_clicks: int | None) -> bool:
-        """Open confirmation dialog before running simulation."""
-        return bool(n_clicks)
-
-    @app.callback(
         Output("sim-result-store", "data"),
-        Input("sim-confirm-dialog", "submit_n_clicks"),
+        Output("sim-trigger-btn", "children"),
+        Input("sim-trigger-btn", "n_clicks"),
         State("sim-event-type", "value"),
         State("sim-scope-selector", "value"),
         State("sim-zone-selector", "value"),
@@ -115,7 +106,7 @@ def _register_trigger(app: object) -> None:
         zone_id: str | None,
         intensity: float | None,
         pathname: str | None,
-    ) -> dict | object:
+    ) -> tuple[dict | object, str | object]:
         """Run the simulation engine and store the result.
 
         Args:
@@ -127,19 +118,19 @@ def _register_trigger(app: object) -> None:
             pathname: Current page URL path.
 
         Returns:
-            Serialized SimulationResult dict, or no_update if skipped.
+            Tuple of (serialized SimulationResult dict, button text).
         """
         if pathname != "/simulation":
-            return no_update
+            return (no_update, no_update)
 
         if not n_clicks or not event_type:
-            return no_update
+            return (no_update, no_update)
 
         scope = scope or "zone"
         effective_scope = zone_id if scope == "zone" else scope
 
         if scope == "zone" and not zone_id:
-            return no_update
+            return (no_update, no_update)
 
         try:
             result: SimulationResult = simulate_scope(
@@ -153,10 +144,10 @@ def _register_trigger(app: object) -> None:
                 f"Simulation complete: {event_type} scope={effective_scope}, "
                 f"damage=€{result.total_financial_damage_eur:.2f}"
             )
-            return result.model_dump(mode="json")
+            return (result.model_dump(mode="json"), "Results Ready")
         except Exception as exc:
             logger.error(f"Simulation trigger error: {exc}")
-            return no_update
+            return (no_update, no_update)
 
 
 # ═══════════════════════════════════════════════

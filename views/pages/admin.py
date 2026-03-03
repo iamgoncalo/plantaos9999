@@ -243,8 +243,7 @@ def create_admin_page() -> html.Div:
     """
     return html.Div(
         [
-            # -- Session store + confirm dialogs --------------------
-            dcc.Store(id="admin-settings-store", storage_type="local"),
+            # -- Confirm dialogs --------------------
             dcc.ConfirmDialog(
                 id="admin-confirm-save",
                 message="Save these settings?",

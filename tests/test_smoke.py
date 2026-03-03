@@ -85,6 +85,26 @@ def test_admin_page_no_duplicate_store() -> None:
     )
 
 
+def test_booking_page_component_ids() -> None:
+    """Booking page layout contains all callback-referenced IDs."""
+    from views.pages.booking import create_booking_page
+
+    source = inspect.getsource(create_booking_page)
+    required_ids = [
+        "booking-date-picker",
+        "booking-time-start",
+        "booking-duration",
+        "booking-people",
+        "booking-floor-pref",
+        "booking-requirements",
+        "booking-find-btn",
+        "booking-results-container",
+        "booking-calendar-chart",
+    ]
+    for cid in required_ids:
+        assert cid in source, f"Missing component ID: {cid}"
+
+
 def test_app_imports() -> None:
     """The top-level app object must be importable without error."""
     from app import app

@@ -60,7 +60,7 @@ _WALL_HEIGHT_1 = _FLOOR_1_Y_TOP - _FLOOR_1_Y_BASE  # 3.0m
 _ZONE_PADDING = 0.05
 
 # Default zone material opacity
-_ZONE_OPACITY = 0.85
+_ZONE_OPACITY = 0.92
 
 
 def generate_3d_html(
@@ -97,7 +97,7 @@ def generate_3d_html(
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  html, body {{ width: 100%; height: 100%; overflow: hidden; background: linear-gradient(180deg, #e0ecf5 0%, #f0f4f8 50%, #f8fafc 100%); }}
+  html, body {{ width: 100%; height: 100%; overflow: hidden; background: linear-gradient(180deg, #dae4ed 0%, #e8ecf0 50%, #f0f2f4 100%); }}
   canvas {{ display: block; }}
   #tooltip {{
     position: absolute;
@@ -168,7 +168,7 @@ def generate_3d_html(
 
   // -- Scene setup -----------------------------------------
   var scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xf0f4f8, 100, 250);
+  scene.fog = new THREE.Fog(0xe8ecf0, 100, 350);
 
   var camera = new THREE.PerspectiveCamera(
     40, window.innerWidth / window.innerHeight, 0.5, 250
@@ -182,7 +182,7 @@ def generate_3d_html(
   }});
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0xf0f4f8, 1);
+  renderer.setClearColor(0xe8ecf0, 1);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
@@ -314,6 +314,14 @@ def generate_3d_html(
   }}
   addFloorSlab({_FLOOR_0_Y_BASE});
   addFloorSlab({_FLOOR_1_Y_BASE});
+
+  // Building outline wireframe for visibility
+  var outlineGeo = new THREE.BoxGeometry({FLOOR_WIDTH_M + 0.2:.1f}, 6.4, {FLOOR_HEIGHT_M + 0.2:.1f});
+  var outlineEdges = new THREE.EdgesGeometry(outlineGeo);
+  var outlineMat = new THREE.LineBasicMaterial({{color: 0x888888, transparent: true, opacity: 0.3}});
+  var outline = new THREE.LineSegments(outlineEdges, outlineMat);
+  outline.position.set({cam_target_x:.1f}, 3.1, {cam_target_z:.1f});
+  scene.add(outline);
 
   // -- Zone meshes container -------------------------------
   var zoneMeshes = [];

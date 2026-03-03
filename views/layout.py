@@ -40,6 +40,8 @@ def create_layout() -> html.Div:
             dcc.Store(id="auth-store", storage_type="session", data=None),
             dcc.Store(id="notification-open-store", storage_type="memory", data=False),
             dcc.Store(id="tenant-pending-store", storage_type="memory"),
+            dcc.Store(id="sensors-selected-device", storage_type="memory", data=""),
+            dcc.Store(id="sensors-action-store", storage_type="memory"),
             dcc.ConfirmDialog(
                 id="tenant-confirm-dialog",
                 message=(

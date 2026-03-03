@@ -7,8 +7,11 @@ from __future__ import annotations
 
 from datetime import date
 
+from loguru import logger
+
 from config.afi_config import DEFAULT_AFI_CONFIG
 from config.building import get_monitored_zones
+from core.afi.aco import ACOConfig, aco_optimize
 
 
 def score_room(
@@ -46,6 +49,11 @@ def score_room(
         temp = comfort_data.get("temperature_c")
         if temp and 20 <= temp <= 24:
             score += 5
+
+    # ACO routing penalty: farther rooms get a small deduction
+    route_cost = _aco_routing_score(zone_id)
+    score -= int(route_cost * 0.1 * 10)  # ~10% weight on routing distance
+
     return min(100, max(0, score))
 
 
@@ -145,6 +153,43 @@ def fallback_projection(
         co2_out = (co2s[-1] - 400) * 0.02
         co2s.append(round(max(400.0, co2s[-1] + co2_in - co2_out), 1))
     return temps, co2s
+
+
+def _aco_routing_score(zone_id: str) -> float:
+    """Compute ACO routing cost from building entrance to a zone.
+
+    Uses the zone adjacency graph from afi_engine to find shortest path
+    from the hall (entrance) to the target zone. Returns normalized cost
+    where lower is better.
+
+    Args:
+        zone_id: Target zone ID.
+
+    Returns:
+        Routing cost (0.0 = adjacent to entrance, higher = farther).
+    """
+    try:
+        from core.afi_engine import _ZONE_ADJACENCY
+
+        # Entrance is the hall on the target floor
+        floor = "p0" if zone_id.startswith("p0") else "p1"
+        entrance = f"{floor}_hall" if floor == "p0" else f"{floor}_circulacao"
+
+        if entrance not in _ZONE_ADJACENCY or zone_id not in _ZONE_ADJACENCY:
+            return 0.0
+
+        result = aco_optimize(
+            adjacency=_ZONE_ADJACENCY,
+            source=entrance,
+            targets=[zone_id],
+            config=ACOConfig(n_ants=10, max_iter=10, seed=42),
+        )
+
+        if result.best_route.path:
+            return result.best_route.cost
+    except Exception as exc:
+        logger.debug(f"ACO routing skipped for {zone_id}: {exc}")
+    return 0.0
 
 
 def find_optimal_room(people: int) -> str:

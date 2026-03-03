@@ -209,7 +209,9 @@ def _register_trend_line(app: object) -> None:
             energy_df = store.get_time_range("energy", start, end)
 
             if energy_df is None or energy_df.empty:
-                return empty_chart("No energy data for this period")
+                return empty_chart(
+                    "No energy data for this period. Visit Settings to generate demo data."
+                )
 
             # Column existence checks
             if "timestamp" not in energy_df.columns:
@@ -272,8 +274,10 @@ def _register_trend_line(app: object) -> None:
             return apply_chart_theme(fig, chart_title)
 
         except Exception as e:
-            logger.warning(f"Reports trend line error: {e}")
-            return empty_chart("Aguardando dados...")
+            logger.error(f"Reports trend line error: {e}")
+            return empty_chart(
+                "Unable to load cost trend. Visit Settings to generate demo data."
+            )
 
 
 def _register_zone_ranking(app: object) -> None:
@@ -353,7 +357,9 @@ def _register_savings_chart(app: object) -> None:
             energy_df = store.get_time_range("energy", start, end)
 
             if energy_df is None or energy_df.empty:
-                return empty_chart("Aguardando dados...")
+                return empty_chart(
+                    "No energy data for this period. Visit Settings to generate demo data."
+                )
 
             # Column existence checks
             if "timestamp" not in energy_df.columns:
@@ -411,8 +417,10 @@ def _register_savings_chart(app: object) -> None:
             return apply_chart_theme(fig, "Savings vs. Baseline")
 
         except Exception as e:
-            logger.warning(f"Reports savings chart error: {e}")
-            return empty_chart("Aguardando dados...")
+            logger.error(f"Reports savings chart error: {e}")
+            return empty_chart(
+                "Unable to load savings chart. Visit Settings to generate demo data."
+            )
 
 
 def _register_pdf_download(app: object) -> None:

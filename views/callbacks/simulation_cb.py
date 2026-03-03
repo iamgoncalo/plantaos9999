@@ -18,10 +18,12 @@ from config.theme import (
     CARD_RADIUS,
     CARD_SHADOW,
     STATUS_CRITICAL,
+    STATUS_HEALTHY,
     STATUS_WARNING,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
 )
+from core.afi.pso import PSOConfig, optimize_hvac_setpoints
 from core.simulation import SimulationResult, simulate_scope
 from utils.simulation_helpers import (
     SCENARIO_ROI,
@@ -31,6 +33,14 @@ from utils.simulation_helpers import (
 from views.charts import apply_chart_theme, empty_chart
 from views.components.kpi_card import create_kpi_card
 from views.components.safe_callback import safe_callback
+
+# HVAC event types that benefit from PSO setpoint optimization
+_HVAC_SCENARIOS: set[str] = {
+    "hvac_failure",
+    "hvac_night_off",
+    "setpoint_adjust",
+    "open_window",
+}
 
 
 def register_simulation_callbacks(app: object) -> None:
@@ -88,9 +98,22 @@ def _register_trigger(app: object) -> None:
     """
 
     @app.callback(
+        Output("sim-confirm-dialog", "displayed"),
+        Input("sim-trigger-btn", "n_clicks"),
+        State("url", "pathname"),
+        prevent_initial_call=True,
+    )
+    @safe_callback
+    def show_sim_confirm(n_clicks: int | None, pathname: str | None) -> bool:
+        """Open confirmation dialog before running simulation."""
+        if pathname != "/simulation" or not n_clicks:
+            return False
+        return True
+
+    @app.callback(
         Output("sim-result-store", "data"),
         Output("sim-trigger-btn", "children"),
-        Input("sim-trigger-btn", "n_clicks"),
+        Input("sim-confirm-dialog", "submit_n_clicks"),
         State("sim-event-type", "value"),
         State("sim-scope-selector", "value"),
         State("sim-zone-selector", "value"),
@@ -144,7 +167,33 @@ def _register_trigger(app: object) -> None:
                 f"Simulation complete: {event_type} scope={effective_scope}, "
                 f"damage=€{result.total_financial_damage_eur:.2f}"
             )
-            return (result.model_dump(mode="json"), "Results Ready")
+
+            data = result.model_dump(mode="json")
+
+            # For HVAC scenarios, run PSO to find optimal setpoints
+            if event_type in _HVAC_SCENARIOS and result.timeline:
+                try:
+                    last_step = result.timeline[-1]
+                    zone_states = {
+                        z: {
+                            "temperature_c": last_step.temperature_c,
+                            "co2_ppm": last_step.co2_ppm,
+                            "humidity_pct": 55.0,
+                            "occupant_count": last_step.occupant_count,
+                        }
+                        for z in result.zones_affected[:3]
+                    }
+                    if zone_states:
+                        pso_recs = optimize_hvac_setpoints(
+                            zone_states,
+                            config=PSOConfig(n_particles=20, max_iter=30, seed=42),
+                        )
+                        data["pso_recommendations"] = pso_recs
+                        logger.info(f"PSO recommendations: {len(pso_recs)} zones")
+                except Exception as pso_err:
+                    logger.warning(f"PSO optimization skipped: {pso_err}")
+
+            return (data, "Results Ready")
         except Exception as exc:
             logger.error(f"Simulation trigger error: {exc}")
             return (no_update, no_update)
@@ -370,7 +419,7 @@ def _register_damage_summary(app: object) -> None:
                 else "0"
             )
 
-            return html.Div(
+            kpi_grid = html.Div(
                 [
                     create_kpi_card(
                         title="Monthly Savings",
@@ -396,6 +445,82 @@ def _register_damage_summary(app: object) -> None:
                 ],
                 className="grid-4",
             )
+
+            # Show PSO-optimized setpoint recommendations if available
+            pso_recs = result_data.get("pso_recommendations")
+            if pso_recs and event_type in _HVAC_SCENARIOS:
+                rec_items = []
+                for zone_id, rec in pso_recs.items():
+                    zone_info = get_zone_by_id(zone_id)
+                    zname = zone_info.name if zone_info else zone_id
+                    imp = rec.get("improvement_pct", 0)
+                    rec_items.append(
+                        html.Div(
+                            [
+                                html.Span(
+                                    zname,
+                                    style={
+                                        "fontWeight": 600,
+                                        "fontSize": "13px",
+                                        "color": TEXT_PRIMARY,
+                                    },
+                                ),
+                                html.Span(
+                                    f"{rec['temp_setpoint_c']}°C · "
+                                    f"{rec['ventilation_ach']} ACH · "
+                                    f"{imp:.0f}% better",
+                                    style={
+                                        "fontSize": "12px",
+                                        "color": STATUS_HEALTHY,
+                                    },
+                                ),
+                            ],
+                            style={
+                                "display": "flex",
+                                "justifyContent": "space-between",
+                                "padding": "6px 0",
+                            },
+                        )
+                    )
+                pso_card = html.Div(
+                    [
+                        html.Div(
+                            [
+                                DashIconify(
+                                    icon="mdi:tune-vertical",
+                                    width=16,
+                                    color=ACCENT_BLUE,
+                                ),
+                                html.Span(
+                                    "PSO-Optimized Setpoints",
+                                    style={
+                                        "fontWeight": 600,
+                                        "fontSize": "14px",
+                                        "color": TEXT_PRIMARY,
+                                    },
+                                ),
+                            ],
+                            style={
+                                "display": "flex",
+                                "gap": "6px",
+                                "alignItems": "center",
+                                "marginBottom": "8px",
+                            },
+                        ),
+                        *rec_items,
+                    ],
+                    className="card",
+                    style={
+                        "padding": "14px 16px",
+                        "background": BG_CARD,
+                        "borderRadius": CARD_RADIUS,
+                        "boxShadow": CARD_SHADOW,
+                        "marginTop": "12px",
+                    },
+                )
+                return html.Div([kpi_grid, pso_card])
+
+            return kpi_grid
         except Exception as exc:
             logger.error(f"Savings summary render error: {exc}")
             return empty_damage_summary()

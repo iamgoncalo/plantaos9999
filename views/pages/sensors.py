@@ -297,18 +297,10 @@ def create_sensors_page() -> html.Div:
         ),
     )
 
-    # Stores
-    sensor_action_store = dcc.Store(id="sensors-action-store", storage_type="memory")
-    selected_device_store = dcc.Store(
-        id="sensors-selected-device", storage_type="memory"
-    )
-
     return html.Div(
         [
             confirm_remove,
             confirm_commission,
-            sensor_action_store,
-            selected_device_store,
             page_header,
             kpi_strip,
             html.Div(

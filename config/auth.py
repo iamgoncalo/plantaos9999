@@ -157,3 +157,33 @@ def validate_reset_token(
             break
     del _RESET_TOKENS[token]
     return True
+
+
+def register_user(
+    username: str,
+    password: str,
+    display_name: str,
+    role: UserRole = UserRole.VIEWER,
+) -> User | None:
+    """Register a new user (demo only).
+
+    Args:
+        username: Desired username.
+        password: Plain-text password.
+        display_name: User's display name.
+        role: User role (defaults to VIEWER).
+
+    Returns:
+        New User or None if username already taken.
+    """
+    for existing in DEFAULT_USERS:
+        if existing.username == username:
+            return None
+    new_user = User(
+        username=username,
+        password_hash=_hash_password(password),
+        role=role,
+        display_name=display_name,
+    )
+    DEFAULT_USERS.append(new_user)
+    return new_user
